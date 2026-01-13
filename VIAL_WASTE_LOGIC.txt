@@ -1,0 +1,79 @@
+// Vial Depletion and Waste Management Logic
+// Bu kodu App.tsx handleWithdrawDose fonksiyonuna, satır 470'den sonra ekleyin
+
+// === Vial'lardan doz çek ve boş olanları waste'e taşı ===
+if (!isNoDoseAdditionalImaging && drawAmount > 0) {
+  let remainingToDraw = drawAmount;
+  const updatedVials: typeof vials = [];
+  const vialsToWaste: typeof vials = [];
+
+  for (const vial of vials) {
+    if (remainingToDraw <= 0) {
+      updatedVials.push(vial);
+      continue;
+    }
+
+    const hoursSinceReceived = (now.getTime() - new Date(vial.receivedAt).getTime()) / (1000 * 60 * 60);
+    const currentActivity = calculateDecay(vial.initialAmount, selectedIsotope.halfLifeHours, hoursSinceReceived);
+    
+    if (currentActivity > 0.01) {
+      if (currentActivity >= remainingToDraw) {
+        // Bu vial'dan gerekeni çek
+        const consumed = remainingToDraw;
+        const decayFactor = Math.exp(-0.693 * hoursSinceReceived / selectedIsotope.halfLifeHours);
+        const newInitialAmount = vial.initialAmount - (consumed / decayFactor);
+        
+        if (newInitialAmount > 0.01) {
+          updatedVials.push({ ...vial, initialAmount: newInitialAmount });
+        } else {
+          vialsToWaste.push(vial);
+        }
+        remainingToDraw = 0;
+      } else {
+        // Vial'ı tamamen tüket
+        remainingToDraw -= currentActivity;
+        vialsToWaste.push(vial);
+      }
+    } else {
+      // Zaten boş vial
+      vialsToWaste.push(vial);
+    }
+  }
+
+  // Vial'ları güncelle
+  setVials(updatedVials);
+
+  // Boş vial'ları waste'e gönder
+  if (vialsToWaste.length > 0) {
+    let sicakOdaBin = wasteBins.find(b => b.name === 'Sıcak Oda');
+    if (!sicakOdaBin) {
+      const newBinId = Math.random().toString(36).substr(2, 9);
+      sicakOdaBin = {
+        id: newBinId,
+        name: 'Sıcak Oda',
+        type: 'solid' as const,
+        items: [],
+        isSealed: false
+      };
+      setWasteBins(prev => [...prev, sicakOdaBin!]);
+    }
+
+    const wasteItems: WasteItem[] = vialsToWaste.map(vial => ({
+      id: Math.random().toString(36).substr(2, 9),
+      isotopeId: selectedIsotope.id,
+      activity: 0.05,
+      unit: unit,
+      disposedAt: new Date(),
+      source: 'vial',
+      description: `${vial.label} - Boş flacon`
+    }));
+
+    setWasteBins(prev => prev.map(b =>
+      b.name === 'Sıcak Oda'
+        ? { ...b, items: [...b.items, ...wasteItems] }
+        : b
+    ));
+    
+    addNotification('Boş Flakonlar Atığa Gönderildi', 'info', `${vialsToWaste.length} adet boş flacon otomatik olarak atığa taşındı.`);
+  }
+}

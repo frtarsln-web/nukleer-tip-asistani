@@ -1,0 +1,5 @@
+{
+  "name": "Nükleer Tıp Asistanı Yeni",
+  "description": "Lutesyum, Teknesyum ve İyot için radyonüklid bozunma ve doz dönüşümü (mCi/MBq) hesaplayan profesyonel bir tıbbi araç.",
+  "requestFramePermissions": []
+}
