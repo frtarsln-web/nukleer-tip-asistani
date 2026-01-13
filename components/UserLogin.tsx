@@ -55,7 +55,7 @@ export const UserLogin: React.FC<UserLoginProps> = ({
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-[#020202] via-[#0a0a1a] to-[#020202] flex items-center justify-center p-6 relative overflow-hidden">
+        <div className="min-h-screen bg-gradient-to-br from-[#020202] via-[#0a0a1a] to-[#020202] flex items-center justify-center p-4 sm:p-6 relative overflow-hidden">
             {/* Animated Background Decorations */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none">
                 <div className="absolute top-20 -left-20 w-72 h-72 bg-blue-600/10 rounded-full blur-3xl animate-pulse"></div>
@@ -75,7 +75,7 @@ export const UserLogin: React.FC<UserLoginProps> = ({
                             </svg>
                         </div>
                     </div>
-                    <h1 className="text-3xl font-black tracking-tight mb-3">
+                    <h1 className="text-2xl sm:text-3xl font-black tracking-tight mb-3">
                         <span className="bg-gradient-to-r from-white via-blue-100 to-purple-200 bg-clip-text text-transparent">Nükleer Tıp</span>
                         <br />
                         <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">Asistanı</span>
@@ -133,7 +133,7 @@ export const UserLogin: React.FC<UserLoginProps> = ({
                             </div>
                             <div>
                                 <label className="text-[10px] font-black text-slate-500 uppercase ml-1 mb-1 block">Rol</label>
-                                <div className="grid grid-cols-4 gap-2">
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                                     {Object.values(UserRole).map(role => (
                                         <button
                                             key={role}

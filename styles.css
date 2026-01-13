@@ -877,3 +877,295 @@ html.light {
   background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
   animation: progress-indeterminate 1.5s infinite;
 }
+
+/* ========================================
+   ENHANCED MOBILE RESPONSIVENESS
+   ======================================== */
+
+/* Mobile Base Styles */
+@media (max-width: 639px) {
+  /* Base font size increase for readability */
+  html {
+    font-size: 16px;
+  }
+  
+  /* Ensure all buttons are touch-friendly */
+  button, 
+  .btn,
+  [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+    padding: 12px 16px;
+  }
+  
+  /* Full-width inputs on mobile */
+  input,
+  select,
+  textarea {
+    font-size: 16px !important; /* Prevents iOS zoom on focus */
+    min-height: 44px;
+  }
+  
+  /* Stack flex containers */
+  .flex-row-mobile-stack {
+    flex-direction: column !important;
+  }
+  
+  /* Mobile grid - single column */
+  .grid-cols-2,
+  .grid-cols-3,
+  .grid-cols-4,
+  .grid-cols-5,
+  .grid-cols-6 {
+    grid-template-columns: 1fr !important;
+  }
+  
+  /* Two columns on mobile when needed */
+  .mobile-grid-2 {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  
+  /* Reduced padding/margins on mobile */
+  .p-6 { padding: 1rem !important; }
+  .p-8 { padding: 1rem !important; }
+  .px-6 { padding-left: 1rem !important; padding-right: 1rem !important; }
+  .px-8 { padding-left: 1rem !important; padding-right: 1rem !important; }
+  .gap-6 { gap: 1rem !important; }
+  .gap-8 { gap: 1rem !important; }
+  
+  /* Smaller text on mobile */
+  .text-4xl { font-size: 1.5rem !important; }
+  .text-5xl { font-size: 1.75rem !important; }
+  .text-6xl { font-size: 2rem !important; }
+  
+  /* Full screen modals on mobile */
+  .modal-content,
+  [class*="max-w-"][class*="bg-gradient"] {
+    max-width: 100vw !important;
+    max-height: 100vh !important;
+    width: 100vw !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+  }
+  
+  /* Fix overflow on mobile */
+  .overflow-x-auto {
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Hide large decorative elements */
+  .mobile-hide-decoration {
+    display: none !important;
+  }
+  
+  /* Login screen mobile fixes */
+  .login-container {
+    padding: 1rem !important;
+  }
+  
+  .login-card {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+  }
+  
+  /* Header mobile styles */
+  header,
+  .app-header {
+    padding: 0.5rem !important;
+    flex-wrap: wrap;
+  }
+  
+  .app-header .logo-text {
+    font-size: 1rem !important;
+  }
+  
+  /* Dashboard cards mobile */
+  .dashboard-card {
+    padding: 0.75rem !important;
+  }
+  
+  /* Patient cards mobile */
+  .patient-card {
+    padding: 0.75rem !important;
+    font-size: 0.875rem !important;
+  }
+  
+  /* Room cards mobile */
+  .room-card {
+    min-width: 100% !important;
+    flex: 1 1 100% !important;
+  }
+  
+  /* Fix horizontal scroll issues */
+  .flex-nowrap {
+    flex-wrap: wrap !important;
+  }
+  
+  /* Stats grid mobile */
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  
+  /* Action buttons mobile - stack vertically */
+  .action-buttons {
+    flex-direction: column !important;
+    gap: 0.5rem !important;
+  }
+  
+  .action-buttons button {
+    width: 100% !important;
+  }
+}
+
+/* Small mobile (iPhone SE, etc.) */
+@media (max-width: 374px) {
+  html {
+    font-size: 14px;
+  }
+  
+  .text-xs { font-size: 0.625rem !important; }
+  .text-sm { font-size: 0.75rem !important; }
+  
+  /* Even smaller padding */
+  .p-4 { padding: 0.5rem !important; }
+  .p-6 { padding: 0.75rem !important; }
+}
+
+/* Tablet styles */
+@media (min-width: 640px) and (max-width: 1023px) {
+  /* Two column grids on tablet */
+  .grid-cols-3,
+  .grid-cols-4,
+  .grid-cols-5,
+  .grid-cols-6 {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  
+  /* Modal sizing for tablet */
+  .modal-content {
+    max-width: 90vw !important;
+    max-height: 90vh !important;
+  }
+}
+
+/* Touch device optimizations */
+@media (pointer: coarse) {
+  /* Larger touch targets */
+  button,
+  .btn,
+  [role="button"],
+  a {
+    min-height: 44px;
+  }
+  
+  /* Remove hover effects that don't work on touch */
+  .hover\:scale-105:hover {
+    transform: none;
+  }
+  
+  /* Active state instead of hover */
+  button:active,
+  .btn:active {
+    transform: scale(0.98);
+  }
+  
+  /* Larger checkbox/radio */
+  input[type="checkbox"],
+  input[type="radio"] {
+    width: 24px;
+    height: 24px;
+  }
+  
+  /* Scrollable containers */
+  .scrollable-mobile {
+    -webkit-overflow-scrolling: touch;
+    overflow-y: auto;
+    max-height: 60vh;
+  }
+}
+
+/* Landscape phone */
+@media (max-height: 500px) and (orientation: landscape) {
+  .modal-content {
+    max-height: 100vh !important;
+    overflow-y: auto;
+  }
+  
+  /* Reduce vertical spacing */
+  .py-6 { padding-top: 0.5rem !important; padding-bottom: 0.5rem !important; }
+  .my-6 { margin-top: 0.5rem !important; margin-bottom: 0.5rem !important; }
+}
+
+/* ========================================
+   UTILITY CLASSES FOR MOBILE
+   ======================================== */
+
+/* Force single column */
+.mobile-single-col {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Mobile-friendly scrolling container */
+.mobile-scroll-x {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.mobile-scroll-x::-webkit-scrollbar {
+  display: none;
+}
+
+/* Card that takes full width on mobile */
+.mobile-full-card {
+  width: 100%;
+  max-width: 100%;
+}
+
+@media (max-width: 639px) {
+  .mobile-full-card {
+    border-radius: 0.5rem;
+    margin-left: -0.5rem;
+    margin-right: -0.5rem;
+    width: calc(100% + 1rem);
+  }
+}
+
+/* Sticky header for mobile */
+.mobile-sticky-header {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  background: inherit;
+}
+
+/* Bottom sheet style modal for mobile */
+@media (max-width: 639px) {
+  .mobile-bottom-sheet {
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    top: auto !important;
+    max-height: 90vh !important;
+    border-radius: 1rem 1rem 0 0 !important;
+    animation: slide-up 0.3s ease;
+  }
+}
+
+/* Floating action button mobile position */
+.fab-mobile {
+  position: fixed;
+  bottom: 80px; /* Above mobile nav */
+  right: 1rem;
+  z-index: 50;
+}
+
+/* Mobile navigation safe area */
+.mobile-nav-safe {
+  padding-bottom: calc(70px + env(safe-area-inset-bottom, 0));
+}
