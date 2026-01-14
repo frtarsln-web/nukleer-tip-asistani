@@ -897,45 +897,89 @@ export const PatientWaitingTracker: React.FC<PatientWaitingTrackerProps> = ({
                 </section>
             )}
 
-            {/* Ek Çekim Bekleyenler */}
-            {waitingPatients.filter(p => p.status === 'additionalReady').length > 0 && (
+            {/* Ek Çekim Bekleyenler - Doğrudan additionalImagingPatients'dan */}
+            {Object.keys(additionalImagingPatients).length > 0 && (
                 <section className="space-y-4">
                     <div className="flex items-center gap-2 px-2">
                         <div className="w-2 h-2 rounded-full bg-orange-500 animate-pulse"></div>
                         <h3 className="text-[10px] font-black text-orange-400 uppercase tracking-[0.2em]">
-                            ➕ EK ÇEKİM BEKLEYENLER ({waitingPatients.filter(p => p.status === 'additionalReady').length})
+                            ➕ EK ÇEKİM BEKLEYENLER ({Object.keys(additionalImagingPatients).length})
                         </h3>
                     </div>
 
                     <div className="grid gap-3">
-                        {waitingPatients.filter(p => p.status === 'additionalReady').map(patient => (
-                            <div
-                                key={patient.entry.id}
-                                className="relative overflow-hidden rounded-2xl p-4 border bg-gradient-to-r from-orange-500/20 to-orange-600/10 border-orange-500/30 ring-2 ring-orange-500/50"
-                            >
-                                <div className="flex justify-between items-center">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-orange-500/30 text-orange-400 animate-pulse">
-                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                            </svg>
+                        {(Object.entries(additionalImagingPatients) as [string, { region: string; addedAt: Date; scheduledMinutes: number }][]).map(([patientId, info]) => {
+                            // History'den hastayı bul (status'a bakmadan)
+                            const patient = history.find(h => h.id === patientId);
+                            if (!patient) return null;
+
+                            // Bekleme süresini hesapla
+                            const waitingMinutes = Math.floor((currentTime.getTime() - new Date(info.addedAt).getTime()) / 60000);
+                            const remainingMinutes = Math.max(0, info.scheduledMinutes - waitingMinutes);
+                            const isReady = waitingMinutes >= info.scheduledMinutes;
+                            const timeLabel = info.scheduledMinutes === 60 ? '1 saat' : info.scheduledMinutes === 90 ? '1.5 saat' : '2 saat';
+
+                            return (
+                                <div
+                                    key={patientId}
+                                    className={`relative overflow-hidden rounded-2xl p-4 border transition-all ${isReady
+                                        ? 'bg-gradient-to-r from-emerald-500/20 to-emerald-600/10 border-emerald-500/30 ring-2 ring-emerald-500/50'
+                                        : 'bg-gradient-to-r from-orange-500/20 to-orange-600/10 border-orange-500/30'
+                                        }`}
+                                >
+                                    <div className="flex justify-between items-center">
+                                        <div className="flex items-center gap-3">
+                                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isReady ? 'bg-emerald-500/30 text-emerald-400' : 'bg-orange-500/30 text-orange-400 animate-pulse'
+                                                }`}>
+                                                {isReady ? (
+                                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                                                    </svg>
+                                                ) : (
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                    </svg>
+                                                )}
+                                            </div>
+                                            <div>
+                                                <p className="text-sm font-black text-white">{patient.patientName}</p>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-[9px] font-bold text-orange-300 uppercase tracking-wider">
+                                                        📍 {info.region}
+                                                    </span>
+                                                    <span className="text-[8px] text-slate-500">•</span>
+                                                    <span className="text-[8px] text-slate-400">{patient.procedure}</span>
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <p className="text-sm font-black text-white">{patient.entry.patientName}</p>
-                                            <p className="text-[9px] font-bold text-orange-300 uppercase tracking-wider">
-                                                {additionalImagingPatients[patient.entry.id]?.region || 'Ek Çekim'}
-                                            </p>
+                                        <div className="flex items-center gap-3">
+                                            <div className="text-right">
+                                                {isReady ? (
+                                                    <>
+                                                        <p className="text-lg font-black text-emerald-400">HAZIR!</p>
+                                                        <p className="text-[8px] text-emerald-300">{waitingMinutes} dk bekledi</p>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <p className="text-lg font-black text-orange-400 tabular-nums">{remainingMinutes} dk</p>
+                                                        <p className="text-[8px] text-orange-300">kaldı ({timeLabel})</p>
+                                                    </>
+                                                )}
+                                            </div>
+                                            <button
+                                                onClick={() => handleStartImagingWithAdditional(patientId, patient.patientName)}
+                                                className={`px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-tight transition-all active:scale-95 ${isReady
+                                                    ? 'bg-emerald-500 hover:bg-emerald-400 text-white animate-pulse'
+                                                    : 'bg-orange-500 hover:bg-orange-400 text-white'
+                                                    }`}
+                                            >
+                                                {isReady ? '📸 Çekime Al' : '⏱️ Erken Başla'}
+                                            </button>
                                         </div>
                                     </div>
-                                    <button
-                                        onClick={() => handleStartImagingWithAdditional(patient.entry.id, patient.entry.patientName)}
-                                        className="px-3 py-2 bg-orange-500 hover:bg-orange-400 text-white rounded-xl text-[9px] font-black uppercase tracking-tight transition-all active:scale-95 animate-pulse"
-                                    >
-                                        Ek Çekime Al
-                                    </button>
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 </section>
             )}
