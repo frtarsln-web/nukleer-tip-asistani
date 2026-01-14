@@ -56,6 +56,21 @@ import { PhysicistDashboard } from './components/PhysicistDashboard';
 import { DailyControlForm } from './components/DailyControlForm';
 import { FDGOrderPlanner } from './components/FDGOrderPlanner';
 import { FDGActivityTracker } from './components/FDGActivityTracker';
+// Firebase for real-time sync
+import {
+  savePatientsInRooms,
+  subscribeToPatientsInRooms,
+  savePatientsInImaging,
+  subscribeToPatientsInImaging,
+  saveAdditionalImagingPatients,
+  subscribeToAdditionalImaging,
+  saveHistory,
+  subscribeToHistory,
+  saveVials,
+  subscribeToVials,
+  savePendingPatients,
+  subscribeToPendingPatients
+} from './firebase';
 
 const STORAGE_KEYS = {
   ISOTOPE: 'nt_selected_isotope',
@@ -277,7 +292,7 @@ const App: React.FC = () => {
     }
   }, [userRole]);
 
-  // Persistence
+  // Persistence - Local Storage (cache)
   useEffect(() => { saveToStorage(currentKeys.VIALS, vials); }, [vials, currentKeys]);
   useEffect(() => { saveToStorage(currentKeys.HISTORY, history); }, [history, currentKeys]);
   useEffect(() => { saveToStorage(currentKeys.WASTE_BINS, wasteBins); }, [wasteBins, currentKeys]);
@@ -285,10 +300,122 @@ const App: React.FC = () => {
   useEffect(() => { saveToStorage(STORAGE_KEYS.USER_ROLE, userRole); }, [userRole]);
   useEffect(() => { saveToStorage(STORAGE_KEYS.PENDING_PATIENTS, pendingPatients); }, [pendingPatients]);
 
-  // Shared state persistence for cross-tab doctor-technician sync
+  // Shared state persistence for cross-tab doctor-technician sync (localStorage)
   useEffect(() => { saveToStorage(STORAGE_KEYS.PATIENTS_IN_ROOMS, patientsInRooms); }, [patientsInRooms]);
   useEffect(() => { saveToStorage(STORAGE_KEYS.PATIENTS_IN_IMAGING, patientsInImaging); }, [patientsInImaging]);
   useEffect(() => { saveToStorage(STORAGE_KEYS.ADDITIONAL_IMAGING, additionalImagingPatients); }, [additionalImagingPatients]);
+
+  // ========== FIREBASE REAL-TIME SYNC ==========
+  // Flag to prevent initial load from triggering save
+  const firebaseInitialized = useRef(false);
+
+  // Save to Firebase when state changes (after initial load)
+  useEffect(() => {
+    if (firebaseInitialized.current) {
+      savePatientsInRooms(patientsInRooms);
+    }
+  }, [patientsInRooms]);
+
+  useEffect(() => {
+    if (firebaseInitialized.current) {
+      savePatientsInImaging(patientsInImaging);
+    }
+  }, [patientsInImaging]);
+
+  useEffect(() => {
+    if (firebaseInitialized.current) {
+      saveAdditionalImagingPatients(additionalImagingPatients);
+    }
+  }, [additionalImagingPatients]);
+
+  useEffect(() => {
+    if (firebaseInitialized.current && history.length > 0) {
+      saveHistory(isotopeId, history);
+    }
+  }, [history, isotopeId]);
+
+  useEffect(() => {
+    if (firebaseInitialized.current && vials.length > 0) {
+      saveVials(isotopeId, vials);
+    }
+  }, [vials, isotopeId]);
+
+  useEffect(() => {
+    if (firebaseInitialized.current) {
+      savePendingPatients(pendingPatients);
+    }
+  }, [pendingPatients]);
+
+  // Subscribe to Firebase real-time updates
+  useEffect(() => {
+    console.log('🔥 Firebase: Subscribing to real-time updates...');
+
+    // Subscribe to shared state
+    const unsubRooms = subscribeToPatientsInRooms((data) => {
+      if (data) {
+        console.log('🔥 Firebase: patientsInRooms updated', Object.keys(data).length);
+        setPatientsInRooms(data);
+      }
+    });
+
+    const unsubImaging = subscribeToPatientsInImaging((data) => {
+      if (data) {
+        console.log('🔥 Firebase: patientsInImaging updated', Object.keys(data).length);
+        setPatientsInImaging(data);
+      }
+    });
+
+    const unsubAdditional = subscribeToAdditionalImaging((data) => {
+      if (data) {
+        console.log('🔥 Firebase: additionalImagingPatients updated', Object.keys(data).length);
+        setAdditionalImagingPatients(data);
+      }
+    });
+
+    const unsubPending = subscribeToPendingPatients((data) => {
+      if (data) {
+        console.log('🔥 Firebase: pendingPatients updated', data.length);
+        setPendingPatients(data);
+      }
+    });
+
+    // Mark as initialized after short delay to prevent initial save
+    setTimeout(() => {
+      firebaseInitialized.current = true;
+      console.log('🔥 Firebase: Initialized and ready for real-time sync');
+    }, 2000);
+
+    return () => {
+      unsubRooms();
+      unsubImaging();
+      unsubAdditional();
+      unsubPending();
+    };
+  }, []);
+
+  // Subscribe to isotope-specific data
+  useEffect(() => {
+    console.log('🔥 Firebase: Subscribing to isotope data:', isotopeId);
+
+    const unsubHistory = subscribeToHistory(isotopeId, (data) => {
+      if (data && data.length > 0) {
+        console.log('🔥 Firebase: history updated for', isotopeId, data.length, 'entries');
+        setHistory(data);
+      }
+    });
+
+    const unsubVials = subscribeToVials(isotopeId, (data) => {
+      if (data && data.length > 0) {
+        console.log('🔥 Firebase: vials updated for', isotopeId, data.length, 'vials');
+        setVials(data);
+      }
+    });
+
+    return () => {
+      unsubHistory();
+      unsubVials();
+    };
+  }, [isotopeId]);
 
   // Cross-tab sync listener - Doctor sees changes from Technician in real-time
   useEffect(() => {
