@@ -128,23 +128,23 @@ SİPARİŞ:
     };
 
     return (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl shadow-2xl w-full max-w-lg border border-orange-500/30 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-0 sm:p-4">
+            <div className="bg-gradient-to-br from-gray-900 to-gray-800 sm:rounded-2xl shadow-2xl w-full h-full sm:h-auto sm:max-w-lg border-0 sm:border border-orange-500/30 sm:max-h-[90vh] overflow-y-auto">
                 {/* Header */}
-                <div className="bg-gradient-to-r from-orange-600 to-amber-600 p-4 rounded-t-2xl flex justify-between items-center sticky top-0 z-10">
+                <div className="bg-gradient-to-r from-orange-600 to-amber-600 p-3 sm:p-4 sm:rounded-t-2xl flex justify-between items-center sticky top-0 z-10">
                     <div>
-                        <h2 className="text-xl font-bold text-white">📦 FDG Sipariş Planlayıcı</h2>
-                        <p className="text-orange-100 text-sm">Basit Doz Hesaplama</p>
+                        <h2 className="text-lg sm:text-xl font-bold text-white">📦 FDG Sipariş</h2>
+                        <p className="text-orange-100 text-xs sm:text-sm">Basit Doz Hesaplama</p>
                     </div>
                     <button
                         onClick={onClose}
-                        className="text-white/80 hover:text-white text-2xl font-bold w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/20 transition-colors"
+                        className="text-white/80 hover:text-white text-2xl font-bold w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-colors"
                     >
                         ×
                     </button>
                 </div>
 
-                <div className="p-6 space-y-6">
+                <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
                     {/* Tarih */}
                     <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
                         <label className="block text-gray-300 text-sm mb-2">📅 Sipariş Tarihi</label>
@@ -289,7 +289,7 @@ SİPARİŞ:
 
                     {/* Aksiyon Butonları */}
                     {showResults && (
-                        <div className="flex gap-3">
+                        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
                             <button
                                 onClick={handlePrint}
                                 className="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-semibold py-3 px-4 rounded-xl transition-colors flex items-center justify-center gap-2"

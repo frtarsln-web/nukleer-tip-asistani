@@ -251,34 +251,34 @@ export const FDGActivityTracker: React.FC<FDGActivityTrackerProps> = ({ onClose 
         : 0;
 
     return (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl shadow-2xl w-full max-w-2xl border border-cyan-500/30 max-h-[95vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-0 sm:p-4">
+            <div className="bg-gradient-to-br from-gray-900 to-gray-800 sm:rounded-2xl shadow-2xl w-full h-full sm:h-auto sm:max-w-2xl border-0 sm:border border-cyan-500/30 sm:max-h-[95vh] overflow-y-auto">
                 {/* Header */}
-                <div className="bg-gradient-to-r from-cyan-600 to-blue-600 p-4 rounded-t-2xl flex justify-between items-center sticky top-0 z-10">
+                <div className="bg-gradient-to-r from-cyan-600 to-blue-600 p-3 sm:p-4 sm:rounded-t-2xl flex justify-between items-center sticky top-0 z-10">
                     <div>
-                        <h2 className="text-xl font-bold text-white">📊 FDG Aktivite Takibi</h2>
-                        <p className="text-cyan-100 text-sm">Gerçek zamanlı havuz durumu</p>
+                        <h2 className="text-lg sm:text-xl font-bold text-white">📊 Aktivite Takip</h2>
+                        <p className="text-cyan-100 text-xs sm:text-sm">Gerçek zamanlı havuz</p>
                     </div>
                     <button
                         onClick={onClose}
-                        className="text-white/80 hover:text-white text-2xl font-bold w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/20 transition-colors"
+                        className="text-white/80 hover:text-white text-2xl font-bold w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/20 transition-colors"
                     >
                         ×
                     </button>
                 </div>
 
-                <div className="p-6 space-y-6">
+                <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
                     {/* Aksiyon Butonları */}
-                    <div className="flex gap-3 flex-wrap">
+                    <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
                         <button
                             onClick={() => setShowAddDose(true)}
-                            className="flex-1 min-w-[140px] bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white font-semibold py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-2"
+                            className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white font-semibold py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-2"
                         >
                             📦 Doz Ekle
                         </button>
                         <button
                             onClick={() => setShowAddInjection(true)}
-                            className="flex-1 min-w-[140px] bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-semibold py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-2"
+                            className="flex-1 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-semibold py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-2"
                             disabled={doseArrivals.length === 0}
                         >
                             💉 Enjeksiyon
@@ -287,7 +287,7 @@ export const FDGActivityTracker: React.FC<FDGActivityTrackerProps> = ({ onClose 
                             onClick={handleReset}
                             className="bg-gray-700 hover:bg-red-600 text-white font-semibold py-3 px-4 rounded-xl transition-colors flex items-center justify-center gap-2"
                         >
-                            🗑️
+                            🗑️ Sıfırla
                         </button>
                     </div>
 
@@ -295,7 +295,7 @@ export const FDGActivityTracker: React.FC<FDGActivityTrackerProps> = ({ onClose 
                     {showAddDose && (
                         <div className="bg-green-900/30 rounded-xl p-4 border border-green-500/50">
                             <h3 className="text-green-400 font-semibold mb-4">📦 Yeni Doz Geliş</h3>
-                            <div className="grid grid-cols-3 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                                 <div>
                                     <label className="block text-gray-400 text-sm mb-1">Etiket</label>
                                     <select
@@ -348,7 +348,7 @@ export const FDGActivityTracker: React.FC<FDGActivityTrackerProps> = ({ onClose 
                     {showAddInjection && (
                         <div className="bg-purple-900/30 rounded-xl p-4 border border-purple-500/50">
                             <h3 className="text-purple-400 font-semibold mb-4">💉 Yeni Enjeksiyon</h3>
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                                 <div>
                                     <label className="block text-gray-400 text-sm mb-1">Doz (mCi)</label>
                                     <input
