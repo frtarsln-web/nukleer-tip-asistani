@@ -112,6 +112,8 @@ export interface StaffUser {
   id: string;
   name: string;
   role: UserRole;
+  password?: string;
+  isActive: boolean;
   createdAt: Date;
 }
 
@@ -147,6 +149,7 @@ export interface AppNotification {
 }
 
 export enum UserRole {
+  ADMIN = 'admin',
   TECHNICIAN = 'tekniker',
   PHYSICIST = 'fizikçi',
   NURSE = 'hemşire',
@@ -154,8 +157,9 @@ export enum UserRole {
 }
 
 export const ROLE_PERMISSIONS = {
-  [UserRole.TECHNICIAN]: { canPrepare: true },
-  [UserRole.PHYSICIST]: { canPrepare: true },
-  [UserRole.NURSE]: { canPrepare: false },
-  [UserRole.DOCTOR]: { canPrepare: false },
+  [UserRole.ADMIN]: { canPrepare: true, canManageUsers: true },
+  [UserRole.TECHNICIAN]: { canPrepare: true, canManageUsers: false },
+  [UserRole.PHYSICIST]: { canPrepare: true, canManageUsers: false },
+  [UserRole.NURSE]: { canPrepare: false, canManageUsers: false },
+  [UserRole.DOCTOR]: { canPrepare: false, canManageUsers: false },
 };

@@ -60,6 +60,7 @@ export const DoseDispenser: React.FC<DoseDispenserProps> = ({
     readOnly
 }) => {
     const [showProtocol, setShowProtocol] = React.useState(false);
+    const [showAllPatients, setShowAllPatients] = React.useState(false);
     const selectedPatient = pendingPatients.find(p => p.name === patientName);
 
     return (
@@ -82,11 +83,23 @@ export const DoseDispenser: React.FC<DoseDispenserProps> = ({
                                 </svg>
                                 BEKLEYEN HASTALAR
                             </label>
-                            <span className="text-[9px] font-black text-blue-400 bg-blue-500/20 px-2 py-0.5 rounded-lg">
-                                {pendingPatients.length} Hasta
-                            </span>
+                            <div className="flex items-center gap-2">
+                                <span className="text-[9px] font-black text-blue-400 bg-blue-500/20 px-2 py-0.5 rounded-lg">
+                                    {pendingPatients.length} Hasta
+                                </span>
+                                <button
+                                    onClick={() => setShowAllPatients(!showAllPatients)}
+                                    className={`text-[8px] font-bold px-2 py-0.5 rounded-lg transition-all ${showAllPatients
+                                        ? 'bg-blue-500 text-white'
+                                        : 'bg-blue-500/10 text-blue-400 hover:bg-blue-500/20'}`}
+                                >
+                                    {showAllPatients ? '✕ Kapat' : '⬜ Tümünü Gör'}
+                                </button>
+                            </div>
                         </div>
-                        <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                        <div className={`${showAllPatients
+                            ? 'grid grid-cols-2 sm:grid-cols-3 gap-3 max-h-[400px] overflow-y-auto pr-1 custom-scrollbar'
+                            : 'flex gap-2 overflow-x-auto pb-2 scrollbar-hide'}`}>
                             {pendingPatients.map(p => {
                                 const isEkCekim = !!p.additionalInfo;
                                 let countdownText = "";
@@ -104,33 +117,42 @@ export const DoseDispenser: React.FC<DoseDispenserProps> = ({
                                 return (
                                     <button
                                         key={p.id}
-                                        onClick={() => onSelectPendingPatient(p)}
-                                        className={`flex-shrink-0 px-4 py-3 rounded-[1.5rem] border text-[10px] font-black transition-all flex flex-col gap-1 items-start min-w-[124px] ${patientName === p.name
+                                        onClick={() => {
+                                            onSelectPendingPatient(p);
+                                            if (showAllPatients) setShowAllPatients(false);
+                                        }}
+                                        className={`${showAllPatients ? 'w-full' : 'flex-shrink-0 min-w-[140px]'} px-4 py-3 rounded-2xl border text-left transition-all ${patientName === p.name
                                             ? 'bg-blue-600 border-blue-400 text-white shadow-lg shadow-blue-900/40'
                                             : isEkCekim
-                                                ? 'bg-orange-500/5 border-orange-500/20 text-orange-200 hover:bg-orange-500/10'
-                                                : 'bg-black/40 border-white/5 text-slate-400 hover:bg-white/5'
+                                                ? 'bg-orange-500/10 border-orange-500/30 text-orange-200 hover:bg-orange-500/20'
+                                                : 'bg-slate-800/60 border-white/10 text-slate-300 hover:bg-slate-700/60'
                                             }`}
                                     >
-                                        <div className="flex justify-between w-full gap-2 text-left">
-                                            <div className="flex flex-col items-start truncate text-left">
-                                                <div className="flex items-center gap-1 text-left">
-                                                    <span className="truncate">{p.name}</span>
-                                                    {isEkCekim && <span className="w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse"></span>}
-                                                </div>
-                                                {p.protocolNo && <span className="text-[7px] font-black tabular-nums opacity-60">P:{p.protocolNo}</span>}
+                                        {/* Hasta Adı */}
+                                        <div className="flex items-center gap-1.5 mb-1">
+                                            <span className="text-[11px] font-bold truncate max-w-[100px]">{p.name}</span>
+                                            {isEkCekim && <span className="w-2 h-2 rounded-full bg-orange-500 animate-pulse flex-shrink-0"></span>}
+                                        </div>
+
+                                        {/* Protokol No */}
+                                        {p.protocolNo && (
+                                            <div className="text-[9px] font-mono opacity-60 mb-1.5">
+                                                P:{p.protocolNo}
                                             </div>
+                                        )}
+
+                                        {/* Alt Bilgiler: Saat + Prosedür */}
+                                        <div className="flex items-center justify-between gap-2 pt-1 border-t border-white/10">
+                                            <span className="text-[9px] font-semibold opacity-70 uppercase tracking-wide truncate">
+                                                {isEkCekim ? p.additionalInfo?.region : (p.procedure || 'PET/BT')}
+                                            </span>
                                             {isEkCekim ? (
-                                                <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-md ${countdownText === 'OK' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-orange-500/20 text-orange-400'}`}>
+                                                <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded ${countdownText === 'OK' ? 'bg-emerald-500/30 text-emerald-400' : 'bg-orange-500/30 text-orange-400'}`}>
                                                     {countdownText}
                                                 </span>
                                             ) : p.appointmentTime && (
-                                                <span className="opacity-60 text-[8px] font-mono">{p.appointmentTime}</span>
+                                                <span className="text-[9px] font-mono font-bold opacity-80">{p.appointmentTime}</span>
                                             )}
-                                        </div>
-                                        <div className="flex justify-between w-full items-center text-left">
-                                            <span className="text-[7px] uppercase tracking-widest opacity-40 truncate max-w-[60px]">{isEkCekim ? p.additionalInfo?.region : (p.procedure || 'PET/BT')}</span>
-                                            {p.appointmentDate && !isEkCekim && <span className="text-[7px] opacity-40">{p.appointmentDate}</span>}
                                         </div>
                                     </button>
                                 );

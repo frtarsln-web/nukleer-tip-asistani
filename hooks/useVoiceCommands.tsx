@@ -72,7 +72,7 @@ export const useVoiceCommands = (options: UseVoiceCommandsOptions = {}): UseVoic
     const [isListening, setIsListening] = useState(false);
     const [isSupported, setIsSupported] = useState(false);
     const [transcript, setTranscript] = useState('');
-    const recognitionRef = useRef<SpeechRecognition | null>(null);
+    const recognitionRef = useRef<any>(null);
 
     // Check browser support
     useEffect(() => {
@@ -93,14 +93,14 @@ export const useVoiceCommands = (options: UseVoiceCommandsOptions = {}): UseVoic
                 setIsListening(false);
             };
 
-            recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+            recognition.onerror = (event: any) => {
                 setIsListening(false);
                 if (onError) {
                     onError(event.error);
                 }
             };
 
-            recognition.onresult = (event: SpeechRecognitionEvent) => {
+            recognition.onresult = (event: any) => {
                 const lastResult = event.results[event.results.length - 1];
                 const text = lastResult[0].transcript;
                 setTranscript(text);
@@ -204,8 +204,8 @@ export const VoiceCommandButton: React.FC<VoiceButtonProps> = ({ onCommand, clas
             <button
                 onClick={toggleListening}
                 className={`relative p-3 rounded-xl transition-all ${isListening
-                        ? 'bg-red-500 text-white animate-pulse'
-                        : 'bg-purple-500/20 hover:bg-purple-500/30 text-purple-400'
+                    ? 'bg-red-500 text-white animate-pulse'
+                    : 'bg-purple-500/20 hover:bg-purple-500/30 text-purple-400'
                     } ${className}`}
                 title={isListening ? 'Dinlemeyi Durdur' : 'Sesli Komut'}
             >

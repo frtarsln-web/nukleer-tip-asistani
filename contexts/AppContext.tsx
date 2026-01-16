@@ -30,10 +30,10 @@ const saveToStorage = <T,>(key: string, value: T): void => {
 
 // Default staff users
 const DEFAULT_STAFF_USERS: StaffUser[] = [
-    { id: 'tech1', name: 'Tekniker 1', role: UserRole.TECHNICIAN, createdAt: new Date() },
-    { id: 'phys1', name: 'Fizikçi 1', role: UserRole.PHYSICIST, createdAt: new Date() },
-    { id: 'nurse1', name: 'Hemşire 1', role: UserRole.NURSE, createdAt: new Date() },
-    { id: 'doc1', name: 'Doktor Test', role: UserRole.DOCTOR, createdAt: new Date() },
+    { id: 'tech1', name: 'Tekniker 1', role: UserRole.TECHNICIAN, createdAt: new Date(), isActive: true },
+    { id: 'phys1', name: 'Fizikçi 1', role: UserRole.PHYSICIST, createdAt: new Date(), isActive: true },
+    { id: 'nurse1', name: 'Hemşire 1', role: UserRole.NURSE, createdAt: new Date(), isActive: true },
+    { id: 'doc1', name: 'Doktor Test', role: UserRole.DOCTOR, createdAt: new Date(), isActive: true },
 ];
 
 interface AppContextType {
@@ -130,7 +130,8 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
             id: `user_${Date.now()}`,
             name,
             role,
-            createdAt: new Date()
+            createdAt: new Date(),
+            isActive: true
         };
         setStaffUsers(prev => {
             const updated = [...prev, newUser];

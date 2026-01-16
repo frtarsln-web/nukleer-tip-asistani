@@ -204,6 +204,32 @@ const App: React.FC = () => {
   const [lowStockAlerted, setLowStockAlerted] = useState(false);
   const LOW_STOCK_THRESHOLD = 5; // mCi threshold for low stock alert
 
+  // Feature toggle states
+  const [voiceEnabled, setVoiceEnabled] = useState<boolean>(() => {
+    const saved = localStorage.getItem('nt_voice_enabled');
+    return saved !== null ? JSON.parse(saved) : true;
+  });
+  const [qrEnabled, setQrEnabled] = useState<boolean>(() => {
+    const saved = localStorage.getItem('nt_qr_enabled');
+    return saved !== null ? JSON.parse(saved) : true;
+  });
+
+  const toggleVoice = useCallback(() => {
+    setVoiceEnabled(prev => {
+      const newVal = !prev;
+      localStorage.setItem('nt_voice_enabled', JSON.stringify(newVal));
+      return newVal;
+    });
+  }, []);
+
+  const toggleQR = useCallback(() => {
+    setQrEnabled(prev => {
+      const newVal = !prev;
+      localStorage.setItem('nt_qr_enabled', JSON.stringify(newVal));
+      return newVal;
+    });
+  }, []);
+
   // Apply saved theme on app load
   useEffect(() => {
     try {
@@ -1333,9 +1359,17 @@ const App: React.FC = () => {
   };
 
   // Kullanıcı giriş/çıkış fonksiyonları
-  const handleLogin = (user: StaffUser) => {
-    setCurrentUser(user);
-    saveToStorage(STORAGE_KEYS.CURRENT_USER, user);
+  const handleLogin = (user: StaffUser, password?: string): boolean => {
+    // Eğer şifreli kullanıcıysa şifre kontrolü yap
+    const existingUser = staffUsers.find(u => u.id === user.id);
+    if (existingUser?.password) {
+      if (!password || existingUser.password !== password) {
+        return false;
+      }
+    }
+    setCurrentUser(existingUser || user);
+    saveToStorage(STORAGE_KEYS.CURRENT_USER, existingUser || user);
+    return true;
   };
 
   const handleLogout = () => {
@@ -1344,14 +1378,42 @@ const App: React.FC = () => {
     setIsWorkspaceActive(false);
   };
 
-  const handleAddStaffUser = (name: string, role: UserRole) => {
+  const handleAddStaffUser = (name: string, role: UserRole, password?: string) => {
     const newUser: StaffUser = {
       id: Math.random().toString(36).substr(2, 9),
       name,
       role,
+      password,
+      isActive: true,
       createdAt: new Date()
     };
     const updatedUsers = [...staffUsers, newUser];
+    setStaffUsers(updatedUsers);
+    saveToStorage(STORAGE_KEYS.STAFF_USERS, updatedUsers);
+    // Yeni kullanıcı eklendikten sonra otomatik giriş yap
+    handleLogin(newUser, password);
+  };
+
+  // Direct add (for SettingsPanel - receives full StaffUser object)
+  const handleAddStaffUserDirect = (user: StaffUser) => {
+    const updatedUsers = [...staffUsers, user];
+    setStaffUsers(updatedUsers);
+    saveToStorage(STORAGE_KEYS.STAFF_USERS, updatedUsers);
+  };
+
+  const handleUpdateStaffUser = (userId: string, updates: Partial<StaffUser>) => {
+    const updatedUsers = staffUsers.map(u => u.id === userId ? { ...u, ...updates } : u);
+    setStaffUsers(updatedUsers);
+    saveToStorage(STORAGE_KEYS.STAFF_USERS, updatedUsers);
+    // Update currentUser if it's the same user
+    if (currentUser?.id === userId) {
+      setCurrentUser({ ...currentUser, ...updates });
+      saveToStorage(STORAGE_KEYS.CURRENT_USER, { ...currentUser, ...updates });
+    }
+  };
+
+  const handleRemoveStaffUser = (userId: string) => {
+    const updatedUsers = staffUsers.filter(u => u.id !== userId);
     setStaffUsers(updatedUsers);
     saveToStorage(STORAGE_KEYS.STAFF_USERS, updatedUsers);
   };
@@ -1360,6 +1422,7 @@ const App: React.FC = () => {
     return (
       <UserLogin
         users={staffUsers}
+        currentUser={currentUser}
         onLogin={handleLogin}
         onAddUser={handleAddStaffUser}
       />
@@ -2079,9 +2142,7 @@ const App: React.FC = () => {
         />
       </main>
 
-      <footer className="fixed bottom-0 left-0 right-0 w-full max-w-none sm:max-w-2xl md:max-w-3xl lg:max-w-5xl xl:max-w-6xl mx-auto h-12 bg-black/40 backdrop-blur-xl flex items-center justify-center pointer-events-none z-[60]">
-        <div className="w-32 h-1.5 bg-white/20 rounded-full mb-4"></div>
-      </footer>
+      {/* Decorative footer bar removed - was causing layout issues */}
       <NotificationCenter
         notifications={notifications}
         onClose={closeNotification}
@@ -2113,6 +2174,14 @@ const App: React.FC = () => {
             onUnitChange={setUnit}
             soundEnabled={soundEnabled}
             onToggleSound={toggleSound}
+            staffUsers={staffUsers}
+            onAddUser={handleAddStaffUserDirect}
+            onUpdateUser={handleUpdateStaffUser}
+            onRemoveUser={handleRemoveStaffUser}
+            voiceEnabled={voiceEnabled}
+            onToggleVoice={toggleVoice}
+            qrEnabled={qrEnabled}
+            onToggleQR={toggleQR}
           />
         )
       }
@@ -2456,29 +2525,33 @@ const App: React.FC = () => {
       {/* Floating Action Buttons - QR & Voice */}
       <div className="fixed bottom-20 right-4 z-50 flex flex-col gap-3">
         {/* Voice Command Button */}
-        <VoiceCommandButton
-          onCommand={handleVoiceCommand}
-          className="shadow-2xl shadow-purple-500/30"
-        />
+        {voiceEnabled && (
+          <VoiceCommandButton
+            onCommand={handleVoiceCommand}
+            className="shadow-2xl shadow-purple-500/30"
+          />
+        )}
 
         {/* QR Code Button */}
-        <button
-          onClick={() => {
-            // Demo: Generate QR for test patient
-            const testPatient = history[0];
-            if (testPatient) {
-              generatePatientQR(testPatient.id, testPatient.patientName, testPatient.procedure);
-            } else {
-              generatePatientQR('demo-123', 'Demo Hasta', 'Test Prosedür');
-            }
-          }}
-          title="QR Kod Oluştur"
-          className="p-3 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 rounded-xl transition-all shadow-2xl shadow-emerald-500/20 border border-emerald-500/30"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h2M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
-          </svg>
-        </button>
+        {qrEnabled && (
+          <button
+            onClick={() => {
+              // Demo: Generate QR for test patient
+              const testPatient = history[0];
+              if (testPatient) {
+                generatePatientQR(testPatient.id, testPatient.patientName, testPatient.procedure);
+              } else {
+                generatePatientQR('demo-123', 'Demo Hasta', 'Test Prosedür');
+              }
+            }}
+            title="QR Kod Oluştur"
+            className="p-3 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 rounded-xl transition-all shadow-2xl shadow-emerald-500/20 border border-emerald-500/30"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h2M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+            </svg>
+          </button>
+        )}
       </div>
     </div >
   );

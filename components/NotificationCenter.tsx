@@ -40,7 +40,7 @@ export const NotificationCenter: React.FC<NotificationCenterProps> = ({
             {/* Notification Trigger Button */}
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className="fixed top-6 right-6 z-[60] p-4 bg-slate-900/80 backdrop-blur-xl border border-white/5 rounded-full shadow-2xl hover:scale-110 active:scale-95 transition-all group"
+                className="fixed bottom-6 left-4 z-[60] p-3 bg-slate-900/80 backdrop-blur-xl border border-white/5 rounded-full shadow-2xl hover:scale-110 active:scale-95 transition-all group"
             >
                 <div className="relative">
                     <svg className="w-6 h-6 text-slate-400 group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">

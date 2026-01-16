@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { DoseUnit, StaffUser } from '../types';
+import { DoseUnit, StaffUser, UserRole, ROLE_PERMISSIONS } from '../types';
 
 interface SettingsPanelProps {
     onClose: () => void;
@@ -8,6 +8,16 @@ interface SettingsPanelProps {
     onUnitChange: (unit: DoseUnit) => void;
     soundEnabled: boolean;
     onToggleSound: () => void;
+    // User management props
+    staffUsers: StaffUser[];
+    onAddUser: (user: StaffUser) => void;
+    onUpdateUser: (userId: string, updates: Partial<StaffUser>) => void;
+    onRemoveUser: (userId: string) => void;
+    // Feature toggles
+    voiceEnabled: boolean;
+    onToggleVoice: () => void;
+    qrEnabled: boolean;
+    onToggleQR: () => void;
 }
 
 interface AppSettings {
@@ -139,12 +149,83 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
     onUnitChange,
     soundEnabled,
     onToggleSound,
+    staffUsers,
+    onAddUser,
+    onUpdateUser,
+    onRemoveUser,
+    voiceEnabled,
+    onToggleVoice,
+    qrEnabled,
+    onToggleQR,
 }) => {
     const [settings, setSettings] = useState<AppSettings>(() => {
         const saved = localStorage.getItem('nt_app_settings');
         return saved ? { ...defaultSettings, ...JSON.parse(saved) } : defaultSettings;
     });
-    const [activeTab, setActiveTab] = useState<'general' | 'notifications' | 'display' | 'about'>('general');
+    const [activeTab, setActiveTab] = useState<'general' | 'notifications' | 'display' | 'users' | 'about'>('general');
+
+    // User management state
+    const [showAddUser, setShowAddUser] = useState(false);
+    const [editingUser, setEditingUser] = useState<StaffUser | null>(null);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
+    const [newName, setNewName] = useState('');
+    const [newRole, setNewRole] = useState<UserRole>(UserRole.TECHNICIAN);
+    const [newPassword, setNewPassword] = useState('');
+    const [formError, setFormError] = useState('');
+
+    const canManageUsers = currentUser && ROLE_PERMISSIONS[currentUser.role]?.canManageUsers;
+
+    const ROLES = [
+        { value: UserRole.ADMIN, label: 'Admin', icon: '👑', color: 'from-amber-500 to-orange-500' },
+        { value: UserRole.TECHNICIAN, label: 'Teknisyen', icon: '👨‍🔬', color: 'from-blue-500 to-cyan-500' },
+        { value: UserRole.DOCTOR, label: 'Doktor', icon: '👨‍⚕️', color: 'from-purple-500 to-pink-500' },
+        { value: UserRole.PHYSICIST, label: 'Fizikçi', icon: '⚛️', color: 'from-emerald-500 to-teal-500' },
+        { value: UserRole.NURSE, label: 'Hemşire', icon: '👩‍⚕️', color: 'from-rose-500 to-orange-500' },
+    ];
+
+    const handleAddUser = () => {
+        if (!newName.trim()) { setFormError('İsim gerekli!'); return; }
+        const newUser: StaffUser = {
+            id: Math.random().toString(36).substr(2, 9),
+            name: newName.trim(),
+            role: newRole,
+            password: newPassword || undefined,
+            isActive: true,
+            createdAt: new Date(),
+        };
+        onAddUser(newUser);
+        setShowAddUser(false);
+        setNewName(''); setNewRole(UserRole.TECHNICIAN); setNewPassword(''); setFormError('');
+    };
+
+    const handleUpdateUser = () => {
+        if (!editingUser) return;
+        if (!newName.trim()) { setFormError('İsim gerekli!'); return; }
+        onUpdateUser(editingUser.id, {
+            name: newName.trim(),
+            role: newRole,
+            password: newPassword || editingUser.password,
+        });
+        setEditingUser(null);
+        setNewName(''); setNewRole(UserRole.TECHNICIAN); setNewPassword(''); setFormError('');
+    };
+
+    const handleDeleteUser = (userId: string) => {
+        onRemoveUser(userId);
+        setShowDeleteConfirm(null);
+    };
+
+    const handleToggleActive = (userId: string, isActive: boolean) => {
+        onUpdateUser(userId, { isActive: !isActive });
+    };
+
+    const openEditModal = (user: StaffUser) => {
+        setEditingUser(user);
+        setNewName(user.name);
+        setNewRole(user.role);
+        setNewPassword('');
+        setFormError('');
+    };
 
     // Get translation
     const t = useMemo(() => translations[settings.language], [settings.language]);
@@ -201,6 +282,7 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
         { id: 'general', label: t.general, icon: '⚙️' },
         { id: 'notifications', label: t.notifications, icon: '🔔' },
         { id: 'display', label: t.display, icon: '🎨' },
+        ...(canManageUsers ? [{ id: 'users', label: 'Kullanıcılar', icon: '👥' }] : []),
         { id: 'about', label: t.about, icon: 'ℹ️' },
     ];
 
@@ -425,6 +507,39 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                                     </div>
                                 ))}
 
+                                {/* Feature Toggles */}
+                                <div className="bg-slate-700/30 rounded-xl p-4 space-y-3">
+                                    <p className="text-xs text-slate-400 uppercase font-bold mb-2">🔧 Özellikler</p>
+
+                                    {/* Voice Commands Toggle */}
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <p className="text-white font-medium">🎤 Sesli Komutlar</p>
+                                            <p className="text-slate-400 text-sm">Sesle kontrol özelliğini aktifleştir</p>
+                                        </div>
+                                        <button
+                                            onClick={onToggleVoice}
+                                            className={`relative w-14 h-8 rounded-full transition-colors ${voiceEnabled ? 'bg-purple-500' : 'bg-slate-600'}`}
+                                        >
+                                            <span className={`absolute top-1 w-6 h-6 bg-white rounded-full shadow transition-transform ${voiceEnabled ? 'left-7' : 'left-1'}`} />
+                                        </button>
+                                    </div>
+
+                                    {/* QR Code Toggle */}
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <p className="text-white font-medium">📱 QR Kod Oluşturucu</p>
+                                            <p className="text-slate-400 text-sm">QR kod butonunu göster</p>
+                                        </div>
+                                        <button
+                                            onClick={onToggleQR}
+                                            className={`relative w-14 h-8 rounded-full transition-colors ${qrEnabled ? 'bg-emerald-500' : 'bg-slate-600'}`}
+                                        >
+                                            <span className={`absolute top-1 w-6 h-6 bg-white rounded-full shadow transition-transform ${qrEnabled ? 'left-7' : 'left-1'}`} />
+                                        </button>
+                                    </div>
+                                </div>
+
                                 {/* Font Size */}
                                 <div className="bg-slate-700/30 rounded-xl p-4">
                                     <label className="block text-sm font-medium text-slate-300 mb-3">
@@ -446,6 +561,107 @@ export const SettingsPanel: React.FC<SettingsPanelProps> = ({
                                         ))}
                                     </div>
                                 </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'users' && canManageUsers && (
+                            <div className="space-y-4">
+                                <div className="flex items-center justify-between mb-4">
+                                    <h3 className="text-lg font-semibold text-white">👥 Kullanıcı Yönetimi</h3>
+                                    <button
+                                        onClick={() => { setShowAddUser(true); setNewName(''); setNewRole(UserRole.TECHNICIAN); setNewPassword(''); setFormError(''); }}
+                                        className="px-4 py-2 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-amber-400 rounded-xl text-sm font-bold transition-all"
+                                    >
+                                        + Kullanıcı Ekle
+                                    </button>
+                                </div>
+
+                                {/* Users List */}
+                                <div className="space-y-2">
+                                    {staffUsers.map((user) => {
+                                        const roleInfo = ROLES.find((r) => r.value === user.role);
+                                        const isSelf = user.id === currentUser?.id;
+                                        return (
+                                            <div key={user.id} className={`flex items-center gap-4 p-4 rounded-xl border transition-all ${user.isActive !== false ? 'bg-slate-700/30 border-slate-600/30' : 'bg-slate-800/50 border-slate-700/30 opacity-60'}`}>
+                                                <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${roleInfo?.color || 'from-slate-500 to-slate-600'} flex items-center justify-center text-xl`}>
+                                                    {roleInfo?.icon || '👤'}
+                                                </div>
+                                                <div className="flex-1">
+                                                    <div className="flex items-center gap-2">
+                                                        <p className="text-sm font-bold text-white">{user.name}</p>
+                                                        {user.password && <span className="text-xs">🔒</span>}
+                                                        {isSelf && <span className="px-2 py-0.5 bg-purple-500/20 text-purple-400 rounded text-xs font-bold">Siz</span>}
+                                                        {user.isActive === false && <span className="px-2 py-0.5 bg-red-500/20 text-red-400 rounded text-xs font-bold">Pasif</span>}
+                                                    </div>
+                                                    <p className="text-xs text-slate-400">{roleInfo?.label}</p>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <button onClick={() => openEditModal(user)} className="p-2 hover:bg-slate-600/50 rounded-lg transition-colors text-slate-400 hover:text-white" title="Düzenle">✏️</button>
+                                                    {!isSelf && (
+                                                        <>
+                                                            <button onClick={() => handleToggleActive(user.id, user.isActive !== false)} className={`p-2 rounded-lg transition-colors ${user.isActive !== false ? 'hover:bg-orange-500/20 text-orange-400' : 'hover:bg-emerald-500/20 text-emerald-400'}`} title={user.isActive !== false ? 'Pasif Yap' : 'Aktif Yap'}>
+                                                                {user.isActive !== false ? '🚫' : '✅'}
+                                                            </button>
+                                                            <button onClick={() => setShowDeleteConfirm(user.id)} className="p-2 hover:bg-red-500/20 rounded-lg transition-colors text-red-400" title="Sil">🗑️</button>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+
+                                {/* Add/Edit User Modal */}
+                                {(showAddUser || editingUser) && (
+                                    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+                                        <div className="bg-slate-800 border border-white/10 rounded-2xl p-6 w-full max-w-md">
+                                            <h2 className="text-lg font-black text-white mb-4">{editingUser ? 'Kullanıcı Düzenle' : 'Yeni Kullanıcı Ekle'}</h2>
+                                            {formError && <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-sm">{formError}</div>}
+                                            <div className="mb-4">
+                                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">İsim</label>
+                                                <input type="text" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Personel adı..." className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600/50 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-purple-500/50" />
+                                            </div>
+                                            <div className="mb-4">
+                                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Rol</label>
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    {ROLES.map((role) => (
+                                                        <button key={role.value} onClick={() => setNewRole(role.value)} className={`p-3 rounded-xl border transition-all text-left ${newRole === role.value ? 'bg-purple-500/20 border-purple-500/50' : 'bg-slate-700/30 border-slate-600/30 hover:border-slate-500/50'}`}>
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-lg">{role.icon}</span>
+                                                                <span className={`text-sm font-bold ${newRole === role.value ? 'text-purple-400' : 'text-slate-400'}`}>{role.label}</span>
+                                                            </div>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <div className="mb-6">
+                                                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Şifre {editingUser && <span className="text-slate-600">(boş bırakırsanız değişmez)</span>}</label>
+                                                <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder={editingUser ? "Yeni şifre (isteğe bağlı)..." : "Şifre (isteğe bağlı)..."} className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600/50 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-purple-500/50" />
+                                            </div>
+                                            <div className="flex gap-3">
+                                                <button onClick={() => { setShowAddUser(false); setEditingUser(null); }} className="flex-1 py-3 bg-slate-700/50 text-slate-400 rounded-xl text-sm font-bold hover:bg-slate-600/50 transition-all">İptal</button>
+                                                <button onClick={editingUser ? handleUpdateUser : handleAddUser} className="flex-1 py-3 bg-gradient-to-r from-purple-500 to-blue-600 text-white rounded-xl text-sm font-bold hover:scale-[1.02] active:scale-[0.98] transition-all">{editingUser ? 'Güncelle' : 'Ekle'}</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Delete Confirmation Modal */}
+                                {showDeleteConfirm && (
+                                    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+                                        <div className="bg-slate-800 border border-red-500/20 rounded-2xl p-6 w-full max-w-sm">
+                                            <div className="text-center mb-4">
+                                                <div className="w-16 h-16 mx-auto bg-red-500/20 rounded-full flex items-center justify-center text-3xl mb-3">🗑️</div>
+                                                <h2 className="text-lg font-black text-white">Kullanıcıyı Sil?</h2>
+                                                <p className="text-sm text-slate-400 mt-1">Bu işlem geri alınamaz.</p>
+                                            </div>
+                                            <div className="flex gap-3">
+                                                <button onClick={() => setShowDeleteConfirm(null)} className="flex-1 py-3 bg-slate-700/50 text-slate-400 rounded-xl text-sm font-bold hover:bg-slate-600/50 transition-all">İptal</button>
+                                                <button onClick={() => handleDeleteUser(showDeleteConfirm)} className="flex-1 py-3 bg-red-500 text-white rounded-xl text-sm font-bold hover:bg-red-600 transition-all">Sil</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         )}
 
