@@ -56,6 +56,9 @@ import { PhysicistDashboard } from './components/PhysicistDashboard';
 import { DailyControlForm } from './components/DailyControlForm';
 import { FDGOrderPlanner } from './components/FDGOrderPlanner';
 import { FDGActivityTracker } from './components/FDGActivityTracker';
+import { QRCodeGenerator, usePatientQR } from './components/QRCodeGenerator';
+import { VoiceCommandButton, speak } from './hooks/useVoiceCommands';
+
 
 const STORAGE_KEYS = {
   ISOTOPE: 'nt_selected_isotope',
@@ -115,11 +118,17 @@ const App: React.FC = () => {
   const [selectedProcedure, setSelectedProcedure] = useState(selectedIsotope.commonProcedures[0]);
   const [drawAmount, setDrawAmount] = useState<number>(5);
   const [patientWeight, setPatientWeight] = useState<string>("");
+  const [bloodGlucose, setBloodGlucose] = useState<string>("");  // Kan şekeri
+  const [medications, setMedications] = useState({ oralKontrast: false, xanax: false, lasix: false }); // İlaçlar
   const [doseRatio, setDoseRatio] = useState<number>(0.131);
   const [isProcessingFile, setIsProcessingFile] = useState(false);
   const [now, setNow] = useState(new Date());
 
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
+
+  // QR Code hook for patient tracking
+  const { showQR, qrData, generatePatientQR, closeQR } = usePatientQR();
+
   const [filteredHistory, setFilteredHistory] = useState<DoseLogEntry[]>([]);
   const [filteredPending, setFilteredPending] = useState<PendingPatient[]>([]);
   const [showAnalytics, setShowAnalytics] = useState(false);
@@ -139,6 +148,7 @@ const App: React.FC = () => {
   // Yeni modal state'leri
   const [showNotificationHistory, setShowNotificationHistory] = useState(false);
   const [showPatientTimeline, setShowPatientTimeline] = useState(false);
+  const [showToolsMenu, setShowToolsMenu] = useState(false);
   const [showPediatricCalc, setShowPediatricCalc] = useState(false);
   const [showEnhancedWaste, setShowEnhancedWaste] = useState(false);
   const [showRadiationSafety, setShowRadiationSafety] = useState(false);
@@ -165,6 +175,28 @@ const App: React.FC = () => {
   const [additionalImagingPatients, setAdditionalImagingPatients] = useState<Record<string, { region: string; addedAt: Date; scheduledMinutes: number }>>(
     () => loadFromStorage(STORAGE_KEYS.ADDITIONAL_IMAGING, {})
   );
+
+  // Voice command handler - moved here after state declarations
+  const handleVoiceCommand = useCallback((action: string, transcript: string) => {
+    console.log('Voice command:', action, transcript);
+    switch (action) {
+      case 'CHECK_STOCK':
+        const totalStock = vials.reduce((sum, v) => sum + getVialCurrentActivity(v, selectedIsotope.halfLifeHours, new Date()), 0);
+        speak(`Mevcut ${selectedIsotope.name} stoku ${totalStock.toFixed(1)} milikiüri.`);
+        break;
+      case 'CHECK_PATIENTS':
+        const roomCount = Object.keys(patientsInRooms).length;
+        const imagingCount = Object.keys(patientsInImaging).length;
+        speak(`${roomCount} hasta odada bekliyor. ${imagingCount} hasta çekimde.`);
+        break;
+      case 'HELP':
+        speak('Kullanılabilir komutlar: Stok ne kadar, Kaç hasta bekliyor, Çekime al, Çekim bitti.');
+        break;
+      default:
+        // Will add notification after addNotification is available
+        console.log('Sesli Komut algılandı:', transcript);
+    }
+  }, [vials, selectedIsotope, patientsInRooms, patientsInImaging]);
 
   // Notification system hooks
   const { soundEnabled, toggleSound, playSound } = useNotificationSound();
@@ -819,6 +851,8 @@ const App: React.FC = () => {
       timestamp: new Date(),
       elapsedAtWithdrawal: 0,
       additionalInfo: patient?.additionalInfo,
+      medications: medications,  // Enjeksiyon öncesi ilaçlar
+      bloodGlucose: bloodGlucose, // Kan şekeri
       preparedBy: currentUser || undefined  // Hazırlayan kişi
     };
 
@@ -966,6 +1000,8 @@ const App: React.FC = () => {
 
     setPatientName("");
     setPatientWeight("");
+    setBloodGlucose("");
+    setMedications({ oralKontrast: false, xanax: false, lasix: false });
     setPendingPatients(prev => prev.filter(p => p.id !== patientId && p.name !== patientName));
     triggerExplosion();
   };
@@ -1060,14 +1096,16 @@ const App: React.FC = () => {
   };
 
   // Hastayı enjeksiyon odasına ata
-  const handleAssignToRoom = (patientId: string, patientName: string, roomId: string | number) => {
+  const handleAssignToRoom = (patientId: string, patientName: string, roomId: string | number, customInjectionTime?: Date) => {
     // Hastayı history'den bul ve prosedur bilgisini al
     const patientEntry = history.find(h => h.id === patientId);
+    // Manuel enjeksiyon saati verilmişse onu kullan, yoksa şimdiki zamanı kullan
+    const injectionTime = customInjectionTime || new Date();
     setPatientsInRooms(prev => ({
       ...prev,
       [patientId]: {
         roomId: roomId.toString(),
-        startTime: new Date(),
+        startTime: injectionTime,
         patientId,
         patientName,
         procedure: patientEntry?.procedure || '',
@@ -1257,6 +1295,8 @@ const App: React.FC = () => {
     setIsWorkspaceActive(true);
     setPatientName("");
     setPatientWeight("");
+    setBloodGlucose("");
+    setMedications({ oralKontrast: false, xanax: false, lasix: false });
     setDrawAmount(5);
     triggerExplosion();
   };
@@ -1419,33 +1459,33 @@ const App: React.FC = () => {
         {/* Header */}
         <header className="relative pt-6 pb-6 px-6">
           {/* Üst Satır: Kullanıcı Bilgisi ve Çıkış */}
-          <div className="flex justify-between items-center mb-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-lg">☢️</div>
-              <div>
-                <p className="text-xs font-bold text-white">{currentUser.name}</p>
-                <p className="text-[9px] text-slate-500 uppercase tracking-wider">{currentUser.role}</p>
+          <div className="flex justify-between items-center gap-2 mb-4">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-sm sm:text-lg flex-shrink-0">☢️</div>
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-white truncate">{currentUser.name}</p>
+                <p className="text-[8px] sm:text-[9px] text-slate-500 uppercase tracking-wider truncate">{currentUser.role}</p>
               </div>
             </div>
             <button
               onClick={handleLogout}
-              className="flex items-center gap-2 px-4 py-2 bg-red-500/20 hover:bg-red-500 border border-red-500/30 hover:border-red-400 text-red-400 hover:text-white rounded-xl font-bold text-xs uppercase tracking-wider transition-all"
+              className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-1.5 sm:py-2 bg-red-500/20 hover:bg-red-500 border border-red-500/30 hover:border-red-400 text-red-400 hover:text-white rounded-lg sm:rounded-xl font-bold text-[10px] sm:text-xs uppercase tracking-wider transition-all flex-shrink-0"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-3 h-3 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
               </svg>
-              Çıkış
+              <span className="hidden sm:inline">Çıkış</span>
             </button>
           </div>
 
           {/* Ana Başlık */}
-          <div className="flex justify-between items-end">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
             <div className="space-y-1">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-lg shadow-emerald-500/50"></div>
                 <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Aktif</span>
               </div>
-              <h1 className="text-3xl font-black tracking-tight">
+              <h1 className="text-xl sm:text-3xl font-black tracking-tight">
                 <span className="bg-gradient-to-r from-white via-blue-100 to-purple-200 bg-clip-text text-transparent">İzotop</span>
                 <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent ml-2">Kütüphanesi</span>
               </h1>
@@ -1454,22 +1494,23 @@ const App: React.FC = () => {
               </p>
             </div>
 
-            <div className="flex gap-2">
+            {/* Icon buttons - responsive sizing */}
+            <div className="flex gap-1 sm:gap-2 flex-wrap">
               <button
                 onClick={() => setShowNuclearInfo(true)}
-                className="group w-10 h-10 rounded-xl bg-gradient-to-br from-purple-600/20 to-pink-900/20 border border-purple-500/30 flex items-center justify-center text-purple-400 hover:from-purple-600 hover:to-pink-600 hover:text-white hover:border-purple-400 transition-all duration-300 hover:scale-105"
+                className="group w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-purple-600/20 to-pink-900/20 border border-purple-500/30 flex items-center justify-center text-purple-400 hover:from-purple-600 hover:to-pink-600 hover:text-white hover:border-purple-400 transition-all duration-300 hover:scale-105"
                 title="Nükleer Tıp Bilgi Merkezi"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-3 h-3 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
                 </svg>
               </button>
               <button
                 onClick={() => setShowHandbook(true)}
-                className="group w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-600/20 to-blue-900/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 hover:from-indigo-600 hover:to-blue-600 hover:text-white hover:border-indigo-400 transition-all duration-300 hover:scale-105"
+                className="group w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-indigo-600/20 to-blue-900/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 hover:from-indigo-600 hover:to-blue-600 hover:text-white hover:border-indigo-400 transition-all duration-300 hover:scale-105"
                 title="Prosedür El Kitabı"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-3 h-3 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
               </button>
@@ -1478,37 +1519,37 @@ const App: React.FC = () => {
                   const { downloadCSVTemplate } = await import('./utils/csvParser');
                   downloadCSVTemplate();
                 }}
-                className="group w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-600/20 to-emerald-900/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 hover:from-emerald-600 hover:to-emerald-700 hover:text-white hover:border-emerald-400 transition-all duration-300 hover:scale-105"
+                className="group w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-emerald-600/20 to-emerald-900/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 hover:from-emerald-600 hover:to-emerald-700 hover:text-white hover:border-emerald-400 transition-all duration-300 hover:scale-105"
                 title="CSV Şablon İndir"
               >
-                <svg className="w-4 h-4 group-hover:animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-3 h-3 sm:w-4 sm:h-4 group-hover:animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
               </button>
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="group w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600/20 to-purple-900/20 border border-blue-500/30 flex items-center justify-center text-blue-400 hover:from-blue-600 hover:to-purple-600 hover:text-white hover:border-blue-400 transition-all duration-300 hover:scale-105"
+                className="group w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-blue-600/20 to-purple-900/20 border border-blue-500/30 flex items-center justify-center text-blue-400 hover:from-blue-600 hover:to-purple-600 hover:text-white hover:border-blue-400 transition-all duration-300 hover:scale-105"
                 title="Günlük Liste Yükle"
               >
-                <svg className="w-4 h-4 group-hover:-translate-y-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-3 h-3 sm:w-4 sm:h-4 group-hover:-translate-y-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                 </svg>
               </button>
               <button
                 onClick={() => setShowDailyControl(true)}
-                className="group w-10 h-10 rounded-xl bg-gradient-to-br from-teal-600/20 to-cyan-900/20 border border-teal-500/30 flex items-center justify-center text-teal-400 hover:from-teal-600 hover:to-cyan-600 hover:text-white hover:border-teal-400 transition-all duration-300 hover:scale-105"
+                className="group w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-teal-600/20 to-cyan-900/20 border border-teal-500/30 flex items-center justify-center text-teal-400 hover:from-teal-600 hover:to-cyan-600 hover:text-white hover:border-teal-400 transition-all duration-300 hover:scale-105"
                 title="Günlük Ortam Kontrolleri"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-3 h-3 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
                 </svg>
               </button>
               <button
                 onClick={() => setShowFDGOrderPlanner(true)}
-                className="group w-10 h-10 rounded-xl bg-gradient-to-br from-orange-600/20 to-amber-900/20 border border-orange-500/30 flex items-center justify-center text-orange-400 hover:from-orange-600 hover:to-amber-600 hover:text-white hover:border-orange-400 transition-all duration-300 hover:scale-105"
+                className="group w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-orange-600/20 to-amber-900/20 border border-orange-500/30 flex items-center justify-center text-orange-400 hover:from-orange-600 hover:to-amber-600 hover:text-white hover:border-orange-400 transition-all duration-300 hover:scale-105"
                 title="FDG Sipariş Planla"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-3 h-3 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                 </svg>
               </button>
@@ -1626,36 +1667,43 @@ const App: React.FC = () => {
         </div>
       )}
 
-      <header className="sticky top-0 z-50 bg-black/80 backdrop-blur-2xl border-b border-white/5 py-3 px-4">
+      <header className="sticky top-0 z-50 bg-black/80 backdrop-blur-2xl border-b border-white/5 py-2 px-2 sm:py-3 sm:px-4">
         {/* Tek Satır Header - Kompakt */}
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center justify-between gap-2 sm:gap-4 overflow-x-auto scrollbar-hide">
           {/* Sol: Geri Butonu + İzotop Bilgisi */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
             <button
               onClick={() => {
                 setIsWorkspaceActive(false);
                 setPatientName("");
                 setPatientWeight("");
               }}
-              className="p-2.5 bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 text-slate-400 hover:text-white transition-all"
+              className="p-2 sm:p-2.5 bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 text-slate-400 hover:text-white transition-all"
               title="İzotop Kütüphanesine Dön"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+              <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
             </button>
-            <div className={`w-10 h-10 rounded-xl ${selectedIsotope.color} bg-opacity-20 flex items-center justify-center`}>
-              <span className="text-sm font-black ${selectedIsotope.color.replace('bg-', 'text-')}">{selectedIsotope.symbol}</span>
+            <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-xl ${selectedIsotope.color} bg-opacity-20 flex items-center justify-center`}>
+              <span className="text-xs sm:text-sm font-black ${selectedIsotope.color.replace('bg-', 'text-')}">{selectedIsotope.symbol}</span>
             </div>
-            <div>
+            <div className="hidden sm:block">
               <h1 className="text-base font-black tracking-tight text-white">{selectedIsotope.name}</h1>
               <p className="text-[9px] font-bold text-slate-500 uppercase">{selectedIsotope.symbol} • T½ {selectedIsotope.halfLifeHours < 1 ? `${(selectedIsotope.halfLifeHours * 60).toFixed(0)} dk` : `${selectedIsotope.halfLifeHours.toFixed(1)} sa`}</p>
             </div>
           </div>
 
-          {/* Orta: Stok Göstergesi */}
-          <div className="flex items-center gap-2 bg-gradient-to-r from-slate-900/90 to-slate-800/80 px-4 py-2 rounded-xl border border-white/10">
+          {/* Orta: Stok Göstergesi - Tablet ve üstünde */}
+          <div className="hidden md:flex items-center gap-2 bg-gradient-to-r from-slate-900/90 to-slate-800/80 px-4 py-2 rounded-xl border border-white/10 flex-shrink-0">
             <div className={`w-2.5 h-2.5 rounded-full ${selectedIsotope.color} animate-pulse`}></div>
             <span className="text-xl font-black tabular-nums text-white">{formatActivity(currentTotalActivity)}</span>
             <span className="text-[10px] font-bold text-slate-400 uppercase">{unit}</span>
+          </div>
+
+          {/* Mobil: Kompakt Stok Badge */}
+          <div className="flex md:hidden items-center gap-1 bg-slate-900/80 px-2 py-1.5 rounded-lg border border-white/10 flex-shrink-0">
+            <div className={`w-2 h-2 rounded-full ${selectedIsotope.color} animate-pulse`}></div>
+            <span className="text-sm font-black tabular-nums text-white">{formatActivity(currentTotalActivity)}</span>
+            <span className="text-[8px] font-bold text-slate-400">{unit}</span>
           </div>
 
           {/* Sağ: Araçlar */}
@@ -1744,10 +1792,11 @@ const App: React.FC = () => {
 
             <ThemeToggle />
 
-            {/* Araçlar Dropdown */}
-            <div className="relative group">
+            {/* Araçlar Dropdown - Click to toggle for mobile support */}
+            <div className="relative">
               <button
-                className="p-2 rounded-lg bg-gradient-to-r from-violet-600/20 to-purple-600/20 hover:from-violet-600 hover:to-purple-600 border border-violet-500/30 hover:border-violet-400 text-violet-400 hover:text-white transition-all"
+                onClick={() => setShowToolsMenu(!showToolsMenu)}
+                className={`p-2 rounded-lg bg-gradient-to-r ${showToolsMenu ? 'from-violet-600 to-purple-600 text-white border-violet-400' : 'from-violet-600/20 to-purple-600/20 text-violet-400 border-violet-500/30'} hover:from-violet-600 hover:to-purple-600 border hover:border-violet-400 hover:text-white transition-all`}
                 title="Araçlar"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1755,67 +1804,73 @@ const App: React.FC = () => {
                 </svg>
               </button>
 
-              {/* Dropdown */}
-              <div className="absolute right-0 top-full mt-2 w-52 bg-slate-800/95 backdrop-blur-xl border border-slate-700 rounded-xl shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 overflow-hidden">
-                <div className="p-1.5">
-                  <p className="text-[8px] font-bold text-slate-500 uppercase tracking-wider px-2 py-1">Yönetim</p>
-                  <button onClick={() => setShowDailyControl(true)} className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-slate-300 hover:bg-teal-500/20 hover:text-teal-300 transition-colors">
-                    <span>📋</span> Günlük Kontrol
-                  </button>
-                  <button onClick={() => setShowScheduler(true)} className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-slate-300 hover:bg-teal-500/20 hover:text-teal-300 transition-colors">
-                    <span>📅</span> Randevu Takvimi
-                  </button>
-                  <button onClick={() => setShowEnhancedDashboard(true)} className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-slate-300 hover:bg-blue-500/20 hover:text-blue-300 transition-colors">
-                    <span>📊</span> Gelişmiş Dashboard
-                  </button>
-                  <button onClick={() => setShowArchive(true)} className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-slate-300 hover:bg-indigo-500/20 hover:text-indigo-300 transition-colors">
-                    <span>🗄️</span> Hasta Arşivi
-                  </button>
-                </div>
 
-                <div className="border-t border-slate-700 p-1.5">
-                  <p className="text-[8px] font-bold text-slate-500 uppercase tracking-wider px-2 py-1">Hesaplama</p>
-                  <button onClick={() => setShowQC(true)} className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-slate-300 hover:bg-emerald-500/20 hover:text-emerald-300 transition-colors">
-                    <span>🔬</span> Kalite Kontrol
-                  </button>
-                  <button onClick={() => setShowPharma(true)} className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-slate-300 hover:bg-rose-500/20 hover:text-rose-300 transition-colors">
-                    <span>💊</span> Farmakokinetik
-                  </button>
-                  <button onClick={() => setShowPediatricCalc(true)} className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-slate-300 hover:bg-pink-500/20 hover:text-pink-300 transition-colors">
-                    <span>👶</span> Pediatrik Doz
-                  </button>
-                  <button onClick={() => setShowStatistics(true)} className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-slate-300 hover:bg-violet-500/20 hover:text-violet-300 transition-colors">
-                    <span>📈</span> İstatistikler
-                  </button>
-                  <button onClick={() => setShowAnalyticsPanel(true)} className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-slate-300 hover:bg-indigo-500/20 hover:text-indigo-300 transition-colors">
-                    <span>📊</span> Gelişmiş Analitik
-                  </button>
-                </div>
-                <div className="border-t border-slate-700 p-1.5">
-                  <p className="text-[8px] font-bold text-slate-500 uppercase tracking-wider px-2 py-1">Planlama</p>
-                  <button onClick={() => setShowAppointments(true)} className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-slate-300 hover:bg-teal-500/20 hover:text-teal-300 transition-colors">
-                    <span>📆</span> Randevu Yönetimi
-                  </button>
-                  <button onClick={() => setShowPatientTimeline(true)} className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-slate-300 hover:bg-blue-500/20 hover:text-blue-300 transition-colors">
-                    <span>⏱️</span> Hasta Zaman Çizelgesi
-                  </button>
-                  <button onClick={() => setShowEnhancedWaste(true)} className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-slate-300 hover:bg-orange-500/20 hover:text-orange-300 transition-colors">
-                    <span>♻️</span> Gelişmiş Atık Takibi
-                  </button>
-                </div>
-                <div className="border-t border-slate-700 p-1.5">
-                  <p className="text-[8px] font-bold text-slate-500 uppercase tracking-wider px-2 py-1">Yardım</p>
-                  <button onClick={() => setShowAI(true)} className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-slate-300 hover:bg-cyan-500/20 hover:text-cyan-300 transition-colors">
-                    <span>🤖</span> AI Asistan
-                  </button>
-                  <button onClick={() => setShowNotificationHistory(true)} className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-slate-300 hover:bg-amber-500/20 hover:text-amber-300 transition-colors">
-                    <span>🔔</span> Bildirim Geçmişi
-                  </button>
-                  <button onClick={() => setShowSettings(true)} className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-slate-300 hover:bg-violet-500/20 hover:text-violet-300 transition-colors">
-                    <span>⚙️</span> Ayarlar
-                  </button>
-                </div>
-              </div>
+              {/* Dropdown - Click toggle with backdrop */}
+              {showToolsMenu && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowToolsMenu(false)} />
+                  <div className="fixed right-2 top-16 w-52 bg-slate-800/95 backdrop-blur-xl border border-slate-700 rounded-xl shadow-2xl z-50 overflow-hidden max-h-[70vh] overflow-y-auto">
+                    <div className="p-1.5">
+                      <p className="text-[8px] font-bold text-slate-500 uppercase tracking-wider px-2 py-1">Yönetim</p>
+                      <button onClick={() => setShowDailyControl(true)} className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-slate-300 hover:bg-teal-500/20 hover:text-teal-300 transition-colors">
+                        <span>📋</span> Günlük Kontrol
+                      </button>
+                      <button onClick={() => setShowScheduler(true)} className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-slate-300 hover:bg-teal-500/20 hover:text-teal-300 transition-colors">
+                        <span>📅</span> Randevu Takvimi
+                      </button>
+                      <button onClick={() => setShowEnhancedDashboard(true)} className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-slate-300 hover:bg-blue-500/20 hover:text-blue-300 transition-colors">
+                        <span>📊</span> Gelişmiş Dashboard
+                      </button>
+                      <button onClick={() => setShowArchive(true)} className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-slate-300 hover:bg-indigo-500/20 hover:text-indigo-300 transition-colors">
+                        <span>🗄️</span> Hasta Arşivi
+                      </button>
+                    </div>
+
+                    <div className="border-t border-slate-700 p-1.5">
+                      <p className="text-[8px] font-bold text-slate-500 uppercase tracking-wider px-2 py-1">Hesaplama</p>
+                      <button onClick={() => setShowQC(true)} className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-slate-300 hover:bg-emerald-500/20 hover:text-emerald-300 transition-colors">
+                        <span>🔬</span> Kalite Kontrol
+                      </button>
+                      <button onClick={() => setShowPharma(true)} className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-slate-300 hover:bg-rose-500/20 hover:text-rose-300 transition-colors">
+                        <span>💊</span> Farmakokinetik
+                      </button>
+                      <button onClick={() => setShowPediatricCalc(true)} className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-slate-300 hover:bg-pink-500/20 hover:text-pink-300 transition-colors">
+                        <span>👶</span> Pediatrik Doz
+                      </button>
+                      <button onClick={() => setShowStatistics(true)} className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-slate-300 hover:bg-violet-500/20 hover:text-violet-300 transition-colors">
+                        <span>📈</span> İstatistikler
+                      </button>
+                      <button onClick={() => setShowAnalyticsPanel(true)} className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-slate-300 hover:bg-indigo-500/20 hover:text-indigo-300 transition-colors">
+                        <span>📊</span> Gelişmiş Analitik
+                      </button>
+                    </div>
+                    <div className="border-t border-slate-700 p-1.5">
+                      <p className="text-[8px] font-bold text-slate-500 uppercase tracking-wider px-2 py-1">Planlama</p>
+                      <button onClick={() => setShowAppointments(true)} className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-slate-300 hover:bg-teal-500/20 hover:text-teal-300 transition-colors">
+                        <span>📆</span> Randevu Yönetimi
+                      </button>
+                      <button onClick={() => setShowPatientTimeline(true)} className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-slate-300 hover:bg-blue-500/20 hover:text-blue-300 transition-colors">
+                        <span>⏱️</span> Hasta Zaman Çizelgesi
+                      </button>
+                      <button onClick={() => setShowEnhancedWaste(true)} className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-slate-300 hover:bg-orange-500/20 hover:text-orange-300 transition-colors">
+                        <span>♻️</span> Gelişmiş Atık Takibi
+                      </button>
+                    </div>
+                    <div className="border-t border-slate-700 p-1.5">
+                      <p className="text-[8px] font-bold text-slate-500 uppercase tracking-wider px-2 py-1">Yardım</p>
+                      <button onClick={() => setShowAI(true)} className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-slate-300 hover:bg-cyan-500/20 hover:text-cyan-300 transition-colors">
+                        <span>🤖</span> AI Asistan
+                      </button>
+                      <button onClick={() => setShowNotificationHistory(true)} className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-slate-300 hover:bg-amber-500/20 hover:text-amber-300 transition-colors">
+                        <span>🔔</span> Bildirim Geçmişi
+                      </button>
+                      <button onClick={() => setShowSettings(true)} className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-slate-300 hover:bg-violet-500/20 hover:text-violet-300 transition-colors">
+                        <span>⚙️</span> Ayarlar
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Kullanıcı ve Çıkış */}
@@ -1897,6 +1952,10 @@ const App: React.FC = () => {
             setPatientName={setPatientName}
             patientWeight={patientWeight}
             setPatientWeight={setPatientWeight}
+            bloodGlucose={bloodGlucose}
+            setBloodGlucose={setBloodGlucose}
+            medications={medications}
+            setMedications={setMedications}
             doseRatio={doseRatio}
             setDoseRatio={setDoseRatio}
             selectedProcedure={selectedProcedure}
@@ -2326,7 +2385,7 @@ const App: React.FC = () => {
 
 
       {
-        isWorkspaceActive && !isMobile && (
+        isWorkspaceActive && (
           <QuickActions
             onNewPatient={() => setPatientName('')}
             onOpenReports={() => setShowReports(true)}
@@ -2341,9 +2400,9 @@ const App: React.FC = () => {
         )
       }
 
-      {/* Mobil Navigasyon */}
+      {/* Mobil Navigasyon - Sadece workspace dışında göster */}
       {
-        isMobile && (
+        isMobile && !isWorkspaceActive && (
           <MobileNav
             currentUser={currentUser}
             userRole={userRole}
@@ -2384,6 +2443,43 @@ const App: React.FC = () => {
         onConfirm={confirmRemoveVial}
         onCancel={() => setVialToDelete(null)}
       />
+
+      {/* QR Code Modal */}
+      {showQR && qrData && (
+        <QRCodeGenerator
+          data={qrData.data}
+          title={qrData.title}
+          onClose={closeQR}
+        />
+      )}
+
+      {/* Floating Action Buttons - QR & Voice */}
+      <div className="fixed bottom-20 right-4 z-50 flex flex-col gap-3">
+        {/* Voice Command Button */}
+        <VoiceCommandButton
+          onCommand={handleVoiceCommand}
+          className="shadow-2xl shadow-purple-500/30"
+        />
+
+        {/* QR Code Button */}
+        <button
+          onClick={() => {
+            // Demo: Generate QR for test patient
+            const testPatient = history[0];
+            if (testPatient) {
+              generatePatientQR(testPatient.id, testPatient.patientName, testPatient.procedure);
+            } else {
+              generatePatientQR('demo-123', 'Demo Hasta', 'Test Prosedür');
+            }
+          }}
+          title="QR Kod Oluştur"
+          className="p-3 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 rounded-xl transition-all shadow-2xl shadow-emerald-500/20 border border-emerald-500/30"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h2M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+          </svg>
+        </button>
+      </div>
     </div >
   );
 };

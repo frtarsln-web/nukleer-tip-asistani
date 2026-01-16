@@ -104,7 +104,7 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({
 
     // Odadaki hastaları al - TÜM PET izotoplarını göster (history yerine patientsInRooms'dan doğrudan al)
     const roomPatients = useMemo(() => {
-        const rooms: Record<string, { patient: { id: string; patientName: string; procedure: string; isotopeId?: string; elapsedMinutes: number; elapsedSeconds: number; formattedTime: string }; startTime: Date } | null> = {};
+        const rooms: Record<string, { patient: { id: string; patientName: string; procedure: string; isotopeId?: string; elapsedMinutes: number; elapsedSeconds: number; formattedTime: string; medications?: { oralKontrast: boolean; xanax: boolean; lasix: boolean; } }; startTime: Date } | null> = {};
 
         INJECTION_ROOMS.forEach(room => {
             const roomValues = Object.values(patientsInRooms) as (RoomPatientInfo & { procedure?: string; isotopeId?: string })[];
@@ -113,6 +113,10 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({
                 const elapsedMs = now.getTime() - new Date(roomEntry.startTime).getTime();
                 const elapsedMinutes = Math.floor(elapsedMs / 60000);
                 const elapsedSeconds = Math.floor((elapsedMs % 60000) / 1000);
+
+                // History'den ilaç bilgilerini bul
+                const historyEntry = history.find(h => h.id === roomEntry.patientId);
+
                 rooms[room.id] = {
                     patient: {
                         id: roomEntry.patientId,
@@ -121,7 +125,8 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({
                         isotopeId: roomEntry.isotopeId,
                         elapsedMinutes,
                         elapsedSeconds,
-                        formattedTime: `${elapsedMinutes}:${elapsedSeconds.toString().padStart(2, '0')}`
+                        formattedTime: `${elapsedMinutes}:${elapsedSeconds.toString().padStart(2, '0')}`,
+                        medications: historyEntry?.medications
                     },
                     startTime: roomEntry.startTime
                 };
@@ -131,7 +136,7 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({
         });
 
         return rooms;
-    }, [patientsInRooms, now]);
+    }, [patientsInRooms, now, history]);
 
     // Ek çekim bekleyen hastalar - bekleme süresi ile
     const additionalScanPatients = useMemo(() => {
@@ -674,9 +679,21 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({
                                                                     <span className="w-4 h-4 bg-amber-500 rounded-full flex items-center justify-center text-[8px] flex-shrink-0" title="Not var">📝</span>
                                                                 )}
                                                             </div>
-                                                            <p className="text-[9px] md:text-[10px] text-white/50 font-bold uppercase tracking-wide mt-0.5">
-                                                                {roomData.patient.procedure}
-                                                            </p>
+                                                            <div className="flex flex-wrap gap-1 mt-1">
+                                                                <p className="text-[9px] md:text-[10px] text-white/50 font-bold uppercase tracking-wide">
+                                                                    {roomData.patient.procedure}
+                                                                </p>
+                                                                {/* İlaç İkonları */}
+                                                                {roomData.patient.medications?.oralKontrast && (
+                                                                    <span title="Oral Kontrast Verildi" className="px-1 py-0.5 rounded bg-purple-500/30 border border-purple-500/50 text-[8px] font-bold text-purple-300 uppercase">OK</span>
+                                                                )}
+                                                                {roomData.patient.medications?.xanax && (
+                                                                    <span title="Xanax Verildi" className="px-1 py-0.5 rounded bg-blue-500/30 border border-blue-500/50 text-[8px] font-bold text-blue-300 uppercase">XNX</span>
+                                                                )}
+                                                                {roomData.patient.medications?.lasix && (
+                                                                    <span title="Lasix Verildi" className="px-1 py-0.5 rounded bg-amber-500/30 border border-amber-500/50 text-[8px] font-bold text-amber-300 uppercase">LSX</span>
+                                                                )}
+                                                            </div>
                                                         </>
                                                     ) : (
                                                         <p className="text-xs md:text-sm text-slate-500 font-bold">Oda {room.id} - Boş</p>
@@ -1328,7 +1345,7 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({
                         {/* Modal Body */}
                         <div className="p-4 md:p-6 space-y-4 overflow-y-auto max-h-[60vh]">
                             {/* Hasta Bilgileri */}
-                            <div className="grid grid-cols-2 gap-3">
+                            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
                                 <div className="bg-slate-800/50 rounded-xl p-3">
                                     <p className="text-[10px] text-slate-400 uppercase mb-1">Enjeksiyon Saati</p>
                                     <p className="text-sm font-bold text-white">
@@ -1343,6 +1360,14 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({
                                     <p className="text-[10px] text-slate-400 uppercase mb-1">İzotop</p>
                                     <p className="text-sm font-bold text-white">{selectedPatient.isotopeId || 'F-18'}</p>
                                 </div>
+                                {/* Kan Şekeri */}
+                                <div className={`bg-slate-800/50 rounded-xl p-3 ${selectedPatient.bloodGlucose && parseInt(selectedPatient.bloodGlucose) > 200 ? 'border border-red-500/50 bg-red-900/10' : ''}`}>
+                                    <p className="text-[10px] text-slate-400 uppercase mb-1">Kan Şekeri</p>
+                                    <p className={`text-sm font-bold ${selectedPatient.bloodGlucose && parseInt(selectedPatient.bloodGlucose) > 200 ? 'text-red-400' : 'text-white'}`}>
+                                        {selectedPatient.bloodGlucose ? `${selectedPatient.bloodGlucose} mg/dL` : 'Belirtilmemiş'}
+                                    </p>
+                                </div>
+                                {/* Durum */}
                                 <div className="bg-slate-800/50 rounded-xl p-3">
                                     <p className="text-[10px] text-slate-400 uppercase mb-1">Durum</p>
                                     <p className="text-sm font-bold text-emerald-400">
@@ -1350,6 +1375,24 @@ export const DoctorDashboard: React.FC<DoctorDashboardProps> = ({
                                             Object.values(patientsInRooms).find((r: any) => r.patientId === selectedPatient.id) ? '💉 Odada' :
                                                 '✓ Tamamlandı'}
                                     </p>
+                                </div>
+                                {/* İlaçlar */}
+                                <div className="bg-slate-800/50 rounded-xl p-3">
+                                    <p className="text-[10px] text-slate-400 uppercase mb-1">Enjeksiyon Öncesi İlaçlar</p>
+                                    <div className="flex flex-wrap gap-1.5 mt-1">
+                                        {selectedPatient.medications?.oralKontrast && (
+                                            <span className="px-1.5 py-0.5 rounded bg-purple-500/30 text-[9px] font-bold text-purple-300 border border-purple-500/50">Oral Kontrast</span>
+                                        )}
+                                        {selectedPatient.medications?.xanax && (
+                                            <span className="px-1.5 py-0.5 rounded bg-blue-500/30 text-[9px] font-bold text-blue-300 border border-blue-500/50">Xanax</span>
+                                        )}
+                                        {selectedPatient.medications?.lasix && (
+                                            <span className="px-1.5 py-0.5 rounded bg-amber-500/30 text-[9px] font-bold text-amber-300 border border-amber-500/50">Lasix</span>
+                                        )}
+                                        {!selectedPatient.medications?.oralKontrast && !selectedPatient.medications?.xanax && !selectedPatient.medications?.lasix && (
+                                            <span className="text-[10px] text-slate-500 italic">İlaç verilmedi</span>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
 

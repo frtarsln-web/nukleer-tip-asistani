@@ -32,7 +32,7 @@ interface PatientWaitingTrackerProps {
     setAdditionalImagingPatients?: React.Dispatch<React.SetStateAction<Record<string, { region: string; addedAt: Date; scheduledMinutes: number }>>>;
     // Enjeksiyon odaları
     patientsInRooms?: Record<string, { roomId: string; startTime: Date; patientId: string; patientName: string }>;
-    onAssignToRoom?: (patientId: string, patientName: string, roomId: string) => void;
+    onAssignToRoom?: (patientId: string, patientName: string, roomId: string, customInjectionTime?: Date) => void;
     onRemoveFromRoom?: (roomId: string) => void;
 }
 
@@ -90,6 +90,9 @@ export const PatientWaitingTracker: React.FC<PatientWaitingTrackerProps> = ({
     const [showCriticalAlert, setShowCriticalAlert] = useState<{ patientName: string; roomId: string; minutes: number } | null>(null);
     const [showTimeSelector, setShowTimeSelector] = useState<{ patientId: string; patientName: string; region: string } | null>(null);
     const [showRegionSelector, setShowRegionSelector] = useState<{ patientId: string; patientName: string } | null>(null);
+
+    // ⏰ Manuel enjeksiyon saati state'i
+    const [manualInjectionTime, setManualInjectionTime] = useState<string>('');
 
     // 🔍 Arama state'i
     const [searchQuery, setSearchQuery] = useState('');
@@ -167,14 +170,31 @@ export const PatientWaitingTracker: React.FC<PatientWaitingTrackerProps> = ({
             onNotify('Oda Yok', 'warning', 'Tüm odalar dolu! Lütfen bir odayı boşaltın.');
             return;
         }
+        // Varsayılan olarak şimdiki saati göster
+        const now = new Date();
+        const hours = now.getHours().toString().padStart(2, '0');
+        const minutes = now.getMinutes().toString().padStart(2, '0');
+        setManualInjectionTime(`${hours}:${minutes}`);
         setShowRoomSelector({ patientId, patientName });
     };
 
     // Oda seçimi onayla
     const handleSelectRoom = (roomId: string) => {
         if (!showRoomSelector || !onAssignToRoom) return;
-        onAssignToRoom(showRoomSelector.patientId, showRoomSelector.patientName, roomId);
+
+        // Manuel saat girilmişse kullan, yoksa şimdiki zamanı kullan
+        let injectionTime: Date | undefined;
+        if (manualInjectionTime && manualInjectionTime.trim() !== '') {
+            const [hours, minutes] = manualInjectionTime.split(':').map(Number);
+            if (!isNaN(hours) && !isNaN(minutes)) {
+                injectionTime = new Date();
+                injectionTime.setHours(hours, minutes, 0, 0);
+            }
+        }
+
+        onAssignToRoom(showRoomSelector.patientId, showRoomSelector.patientName, roomId, injectionTime);
         setShowRoomSelector(null);
+        setManualInjectionTime('');
     };
 
     const handleStartImaging = (patientId: string, patientName: string) => {
@@ -481,6 +501,25 @@ export const PatientWaitingTracker: React.FC<PatientWaitingTrackerProps> = ({
                             <p className="text-sm text-slate-400">{showRoomSelector.patientName} için enjeksiyon odası</p>
                         </div>
 
+                        {/* ⏰ Manuel Enjeksiyon Saati */}
+                        <div className="mb-4 p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl">
+                            <label className="block text-xs font-bold text-amber-400 mb-2 flex items-center gap-2">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                Enjeksiyon Saati
+                            </label>
+                            <input
+                                type="time"
+                                value={manualInjectionTime}
+                                onChange={(e) => setManualInjectionTime(e.target.value)}
+                                className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white text-center text-lg font-bold focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500"
+                            />
+                            <p className="text-[10px] text-slate-500 mt-2 text-center">
+                                Enjeksiyon yapıldığı anı girin. Boş bırakırsanız şimdiki saat kullanılır.
+                            </p>
+                        </div>
+
                         <div className="grid grid-cols-4 gap-2 mb-4">
                             {availableRooms.map(room => (
                                 <button
@@ -494,7 +533,7 @@ export const PatientWaitingTracker: React.FC<PatientWaitingTrackerProps> = ({
                         </div>
 
                         <button
-                            onClick={() => setShowRoomSelector(null)}
+                            onClick={() => { setShowRoomSelector(null); setManualInjectionTime(''); }}
                             className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-2xl font-bold text-xs uppercase tracking-wider transition-all"
                         >
                             İptal

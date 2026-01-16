@@ -99,6 +99,12 @@ export interface DoseLogEntry {
   elapsedAtWithdrawal: number;
   protocolNo?: string;
   additionalInfo?: AdditionalImaging;
+  medications?: {
+    oralKontrast: boolean;
+    xanax: boolean;
+    lasix: boolean;
+  };
+  bloodGlucose?: string; // Kan şekeri (mg/dL)
   preparedBy?: StaffUser;  // Hazırlayan kişi
 }
 

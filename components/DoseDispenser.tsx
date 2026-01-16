@@ -9,6 +9,10 @@ interface DoseDispenserProps {
     setPatientName: (val: string) => void;
     patientWeight: string;
     setPatientWeight: (val: string) => void;
+    bloodGlucose: string;
+    setBloodGlucose: (val: string) => void;
+    medications: { oralKontrast: boolean; xanax: boolean; lasix: boolean; };
+    setMedications: React.Dispatch<React.SetStateAction<{ oralKontrast: boolean; xanax: boolean; lasix: boolean; }>>;
     doseRatio: number;
     setDoseRatio: (val: number) => void;
     selectedProcedure: string;
@@ -34,6 +38,10 @@ export const DoseDispenser: React.FC<DoseDispenserProps> = ({
     setPatientName,
     patientWeight,
     setPatientWeight,
+    bloodGlucose,
+    setBloodGlucose,
+    medications,
+    setMedications,
     doseRatio,
     setDoseRatio,
     selectedProcedure,
@@ -143,6 +151,55 @@ export const DoseDispenser: React.FC<DoseDispenserProps> = ({
                     />
                 </div>
 
+                {/* 💊 Enjeksiyon Öncesi İlaç Kontrol Listesi */}
+                {(selectedIsotope.id === 'f18' || selectedIsotope.id === 'ga68') && (
+                    <div className="bg-purple-500/5 border border-purple-500/20 rounded-2xl p-3 space-y-2">
+                        <label className="text-[7px] font-black text-purple-400 uppercase tracking-wider flex items-center gap-1.5">
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            ENJEKSİYON ÖNCESİ İLAÇLAR
+                        </label>
+                        <div className="flex flex-wrap gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setMedications(prev => ({ ...prev, oralKontrast: !prev.oralKontrast }))}
+                                className={`px-3 py-2 rounded-xl text-[10px] font-black uppercase transition-all flex items-center gap-1.5 ${medications.oralKontrast
+                                    ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/30'
+                                    : 'bg-purple-500/10 text-purple-300 border border-purple-500/20 hover:bg-purple-500/20'
+                                    }`}
+                            >
+                                {medications.oralKontrast ? '✅' : '◯'} Oral Kontrast
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setMedications(prev => ({ ...prev, xanax: !prev.xanax }))}
+                                className={`px-3 py-2 rounded-xl text-[10px] font-black uppercase transition-all flex items-center gap-1.5 ${medications.xanax
+                                    ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/30'
+                                    : 'bg-blue-500/10 text-blue-300 border border-blue-500/20 hover:bg-blue-500/20'
+                                    }`}
+                            >
+                                {medications.xanax ? '✅' : '◯'} Xanax
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setMedications(prev => ({ ...prev, lasix: !prev.lasix }))}
+                                className={`px-3 py-2 rounded-xl text-[10px] font-black uppercase transition-all flex items-center gap-1.5 ${medications.lasix
+                                    ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/30'
+                                    : 'bg-amber-500/10 text-amber-300 border border-amber-500/20 hover:bg-amber-500/20'
+                                    }`}
+                            >
+                                {medications.lasix ? '✅' : '◯'} Lasix
+                            </button>
+                        </div>
+                        {(medications.oralKontrast || medications.xanax || medications.lasix) && (
+                            <p className="text-[9px] text-purple-300/70 mt-1">
+                                📝 Seçili: {[medications.oralKontrast && 'Oral Kontrast', medications.xanax && 'Xanax', medications.lasix && 'Lasix'].filter(Boolean).join(', ')}
+                            </p>
+                        )}
+                    </div>
+                )}
+
                 <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-2xl p-4 space-y-3 text-left">
                     <div className="grid grid-cols-2 gap-3 text-left">
                         <div className="space-y-1 text-left">
@@ -166,6 +223,43 @@ export const DoseDispenser: React.FC<DoseDispenserProps> = ({
                             />
                         </div>
                     </div>
+
+                    {/* Kan Şekeri Girişi - FDG PET için kritik */}
+                    {(selectedIsotope.id === 'f18' || selectedIsotope.id === 'ga68') && (
+                        <div className="mt-3 space-y-1 text-left">
+                            <label className="text-[7px] font-black text-slate-500 uppercase ml-1 italic flex items-center gap-1">
+                                🩸 KAN ŞEKERİ (mg/dL)
+                            </label>
+                            <div className="relative">
+                                <input
+                                    type="number"
+                                    placeholder="Örn: 95"
+                                    value={bloodGlucose}
+                                    onChange={(e) => setBloodGlucose(e.target.value)}
+                                    className={`w-full bg-black/60 border rounded-xl px-3 py-2 text-sm font-black text-white outline-none text-left ${!bloodGlucose ? 'border-white/5' :
+                                        parseInt(bloodGlucose) > 200 ? 'border-red-500 ring-1 ring-red-500/50' :
+                                            parseInt(bloodGlucose) > 150 ? 'border-amber-500 ring-1 ring-amber-500/50' :
+                                                'border-emerald-500 ring-1 ring-emerald-500/50'
+                                        }`}
+                                />
+                                {bloodGlucose && (
+                                    <span className={`absolute right-3 top-2.5 text-[9px] font-black px-2 py-0.5 rounded-md ${parseInt(bloodGlucose) > 200 ? 'bg-red-500/20 text-red-400' :
+                                        parseInt(bloodGlucose) > 150 ? 'bg-amber-500/20 text-amber-400' :
+                                            'bg-emerald-500/20 text-emerald-400'
+                                        }`}>
+                                        {parseInt(bloodGlucose) > 200 ? '🚨 KRİTİK' :
+                                            parseInt(bloodGlucose) > 150 ? '⚠️ DİKKAT' :
+                                                '✅ UYGUN'}
+                                    </span>
+                                )}
+                            </div>
+                            {bloodGlucose && parseInt(bloodGlucose) > 200 && (
+                                <p className="text-[9px] text-red-400 font-bold ml-1 animate-pulse">
+                                    ⚠️ Yüksek kan şekeri! FDG tutulumu olumsuz etkilenebilir.
+                                </p>
+                            )}
+                        </div>
+                    )}
 
                     {recommendedDose > 0 && (
                         <div className="flex justify-between items-center pt-1 animate-in fade-in slide-in-from-top-2 text-left">
